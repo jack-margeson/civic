@@ -1,6 +1,6 @@
-# CIVIC (Central Intelligence Virtualization Instruction Cluster)
+# CIVIC
 
-- [CIVIC (Central Intelligence Virtualization Instruction Cluster)](#civic-central-intelligence-virtualization-instruction-cluster)
+- [CIVIC](#civic)
   - [Team Information](#team-information)
   - [Problem Statement](#problem-statement)
     - [Issues identified in existing solutions](#issues-identified-in-existing-solutions)
