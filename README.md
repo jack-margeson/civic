@@ -98,4 +98,4 @@ CIVIC (Central Intelligence Virtualization Instruction Cluster) provides distrib
 
 ## Design diagram
 
-![Design diagram](project_planning\civic.drawio.png)
+![Design diagram](project_planning/civic.drawio.png)
