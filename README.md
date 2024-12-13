@@ -1,6 +1,16 @@
-# CIVIC
+# CIVIC (Central Intelligence Virtualization Instruction Cluster)
 
-Central Intelligence Virtualization Instruction Cluster
+- [CIVIC (Central Intelligence Virtualization Instruction Cluster)](#civic-central-intelligence-virtualization-instruction-cluster)
+  - [Team Information](#team-information)
+  - [Problem Statement](#problem-statement)
+    - [Issues identified in existing solutions](#issues-identified-in-existing-solutions)
+    - [Proposed flow](#proposed-flow)
+    - [Benefits](#benefits)
+  - [Project Outline](#project-outline)
+    - [Abstract](#abstract)
+    - [Terminology](#terminology)
+    - [CIVIC CLI](#civic-cli)
+  - [Design diagram](#design-diagram)
 
 ## Team Information
 
