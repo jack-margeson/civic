@@ -10,6 +10,8 @@
     - [Abstract](#abstract)
     - [Terminology](#terminology)
     - [CIVIC CLI](#civic-cli)
+    - [Work expected](#work-expected)
+    - [Expected outcomes](#expected-outcomes)
   - [Design diagram](#design-diagram)
 
 ## Team Information
@@ -95,6 +97,18 @@ CIVIC (Central Intelligence Virtualization Instruction Cluster) provides distrib
     - Download all available models hosted for the project, choose one to contribute to
     - Configure resource allocation for virtualizations
     - Create citizens in order to process duties received from the server
+
+### Work expected
+
+- Creation of a command-line application that provides the outlined functionality to both researchers/developers and participants/clients
+- Operation and management of the server-side application for development (database layers, REST API communication with clients)
+- Creation of an example project in the built framework to illustrate operability
+
+### Expected outcomes
+
+- Easily executable command line program or virtual image that provides planned functionality for the project
+- Well documented (incl. comments in all written code, user documentation for command line options/functions)
+- Final report detailing the design and structure of the framework, as well as execution results
 
 ## Design diagram
 
