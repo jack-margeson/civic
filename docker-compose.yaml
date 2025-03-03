@@ -17,39 +17,39 @@ services:
       civic-network:
         ipv4_address: 172.20.0.3
 
-db:
-  build:
-    context: ./sql
-    dockerfile: Dockerfile
-  container_name: civic-db
-  image: civic-db:latest
-  restart: always
-  environment:
-    POSTGRES_USER: civic_db_admin
-    POSTGRES_PASSWORD:
-  volumes:
-    - civic-db:/var/lib/postgresql/data
-    - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
-  ports:
-    - 5432:5432
-  healthcheck:
-    test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
-    interval: 5s
-    timeout: 5s
-    retries: 5
-  networks:
-    civic-network:
-      ipv4_address: 172.20.0.4
+  db:
+    build:
+      context: ./sql
+      dockerfile: Dockerfile
+    container_name: civic-db
+    image: civic-db:latest
+    restart: always
+    environment:
+      POSTGRES_USER: civic_db_admin
+      POSTGRES_PASSWORD:
+    volumes:
+      - civic-db:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - 5432:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      civic-network:
+        ipv4_address: 172.20.0.4
 
-adminer:
-  image: adminer
-  container_name: civic-adminer
-  restart: always
-  ports:
-    - 8080:8080
-  networks:
-    civic-network:
-      ipv4_address: 172.20.0.5
+  adminer:
+    image: adminer
+    container_name: civic-adminer
+    restart: always
+    ports:
+      - 8080:8080
+    networks:
+      civic-network:
+        ipv4_address: 172.20.0.5
 
 volumes:
   civic-db:
