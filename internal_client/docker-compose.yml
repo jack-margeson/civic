@@ -1,0 +1,7 @@
+services:
+  internal-client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: civic-internal-client
+    image: civic-internal-client:latest
