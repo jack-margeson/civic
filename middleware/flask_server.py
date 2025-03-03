@@ -11,16 +11,21 @@ import requests
 import docker
 import time
 import json
+from waitress import serve
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
 
 app = Flask(__name__)
 CORS(app)
-app.config('CORS_HEADERS') = 'Content-Type'
+app.config["CORS_HEADERS"] = "Content-Type"
+
 
 @app.route("/")
 @cross_origin()
 def health_check():
-  return "200 OK"
+    return "200 OK"
 
+
+if __name__ == "__main__":
+    serve(app, host="0.0.0.0", port=5000)
