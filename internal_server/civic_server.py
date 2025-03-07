@@ -1,10 +1,17 @@
 import socket
 import threading
 import logging
+import signal
+import time
+
+logging.basicConfig(level=logging.INFO, force=True)
+
+middleware_url = "http://localhost:5000"
 
 
 class CIVICServer:
-    def __init__(self, host="127.0.0.1", port=65432):
+
+    def __init__(self, host="0.0.0.0", port=24842):
         self.host = host
         self.port = port
         self.clients = []
@@ -27,11 +34,21 @@ class CIVICServer:
                         self.clients.remove(client_socket)
                         client_socket.close()
                         break
+                    elif message.lower() == "ping":
+                        client_socket.send("pong".encode("utf-8"))
+                    else:
+                        client_socket.send("Message not recognized".encode("utf-8"))
                 else:
                     break
             except ConnectionResetError:
                 logging.info(f"Connection from {address} lost")
-                self.clients.remove(client_socket)
+                if client_socket in self.clients:
+                    self.clients.remove(client_socket)
+                break
+            except Exception as e:
+                logging.error(f"An error occurred with connection from {address}: {e}")
+                if client_socket in self.clients:
+                    self.clients.remove(client_socket)
                 break
 
     def start(self):
@@ -43,8 +60,31 @@ class CIVICServer:
             )
             client_thread.start()
 
+    def safe_exit(self, sig, frame):
+        logging.info("Exiting server...")
+        for client in self.clients:
+            try:
+                client.send("Server is shutting down".encode("utf-8"))
+            except Exception as e:
+                logging.error(f"Error notifying client: {e}")
+
+        # Wait for clients to disconnect or timeout after 30 seconds
+        timeout = 30
+        start_time = time.time()
+        while self.clients and (time.time() - start_time) < timeout:
+            for client in self.clients:
+                try:
+                    client.close()
+                except Exception as e:
+                    logging.error(f"Error closing client connection: {e}")
+            time.sleep(1)
+        self.server_socket.close()
+        logging.info("Server closed.")
+        exit(0)
+
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     server = CIVICServer()
+    signal.signal(signal.SIGINT, server.safe_exit)
+    signal.signal(signal.SIGTERM, server.safe_exit)
     server.start()

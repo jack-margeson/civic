@@ -1,6 +1,6 @@
-FROM alpine:latest 
-RUN apk add --no-cache python3 py3-pip
+FROM python:3.13.1
 WORKDIR /app
-COPY . /app
-# RUN pip install -r requirements.txt
+COPY requirements.txt .
+RUN pip install -r requirements.txt 
+COPY . .
 CMD ["python3", "civic_server.py"]
