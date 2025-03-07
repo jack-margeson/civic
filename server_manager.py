@@ -27,12 +27,17 @@ menu_options = [
     [  # Main menu (1)
         {"key": "i", "command": "Install CIVIC Server", "status": 1},
         {"key": "u", "command": "Uninstall CIVIC Server", "status": 1},
-        {"key": "l", "command": "List Models", "status": 1},
         {"key": "m", "command": "Manage Models", "status": 1},
     ],
+    [  # Manage models (2)
+        {"key": "l", "command": "List Models", "status": 1},
+        {"key": "a", "command": "Create Model", "status": 1},
+        {"key": "e", "command": "Edit Model", "status": 1},
+        {"key": "d", "command": "Delete Model", "status": 1},
+    ],
 ]
-menu_states = Enum("Menu", ["GLOBAL", "MAIN"], start=0)
-menu_state_titles = ["Global Commands", "Main Menu"]
+menu_states = Enum("Menu", ["GLOBAL", "MAIN", "MANAGE_MODELS"], start=0)
+menu_state_titles = ["Global Commands", "Main Menu", "Manage Models"]
 curr_menu = menu_states.MAIN
 
 # Get the Docker client
@@ -94,14 +99,36 @@ def main():
                         install_civic_server()
                     case "u":
                         uninstall_civic_server()
-                    case "l":
-                        list_models()
                     case "m":
-                        manage_models()
+                        set_curr_menu(menu_states.MANAGE_MODELS)
             else:
                 if any(
                     choice == item["key"]
                     for item in menu_options[menu_states.MAIN.value]
+                ):
+                    print_error("Command currently disabled. Please try again.")
+                else:
+                    print_error("Command not recognized. Please try again.")
+
+        ### Manage Models (2)
+        elif curr_menu == menu_states.MANAGE_MODELS:
+            if any(
+                choice == item["key"] and item["status"]
+                for item in menu_options[menu_states.MANAGE_MODELS.value]
+            ):
+                match choice:
+                    case "l":
+                        list_models()
+                    case "a":
+                        print("Create Model")
+                    case "e":
+                        print("Edit Model")
+                    case "d":
+                        print("Delete Model")
+            else:
+                if any(
+                    choice == item["key"]
+                    for item in menu_options[menu_states.MANAGE_MODELS.value]
                 ):
                     print_error("Command currently disabled. Please try again.")
                 else:
@@ -187,17 +214,19 @@ def init_server_manager():
     print("Initializing server manager...")
 
     # Check if the CIVIC server is running
-    running = all(
-        container.name
-        in ["civic-internal-server", "civic-middleware", "civic-db", "civic-adminer"]
-        for container in client.containers.list()
+    running = any(
+        container.name == "civic-internal-server" and container.status == "running"
+        for container in client.containers.list(all=True)
     )
+
     if running:
         # Disable "Install CIVIC Server" option
         menu_options[1][0]["status"] = 0
     else:
         # Disable "Uninstall CIVIC Server" option
         menu_options[1][1]["status"] = 0
+        # Disable "Manage Models" option
+        menu_options[1][2]["status"] = 0
 
 
 def install_civic_server():
@@ -304,6 +333,8 @@ def install_civic_server():
     menu_options[1][0]["status"] = 0
     # Enable "Uninstall CIVIC Server" option
     menu_options[1][1]["status"] = 1
+    # Enable "Manage Models" option
+    menu_options[1][2]["status"] = 1
 
 
 def uninstall_civic_server(quiet=False):
@@ -354,6 +385,8 @@ def uninstall_civic_server(quiet=False):
     menu_options[1][0]["status"] = 1
     # Disable "Uninstall CIVIC Server" option
     menu_options[1][1]["status"] = 0
+    # Disable "Manage Models" option
+    menu_options[1][2]["status"] = 0
 
 
 def list_models():
