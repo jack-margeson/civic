@@ -14,6 +14,8 @@ from flask_cors import CORS, cross_origin
 import logging
 import psycopg2
 from psycopg2 import sql
+import signal
+import sys
 
 app = Flask(__name__)
 CORS(app)
@@ -71,6 +73,16 @@ def db_query(query):
     return Response(result, mimetype="application/json")
 
 
+def safe_exit(*args):
+    if db:
+        db.close()
+    app.logger.info("Exiting...")
+    sys.exit(0)
+
+
 if __name__ == "__main__":
+    signal.signal(signal.SIGINT, safe_exit)
+    signal.signal(signal.SIGTERM, safe_exit)
+
     conn_db()
     serve(app, host="0.0.0.0", port=5000)
