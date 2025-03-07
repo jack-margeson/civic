@@ -18,15 +18,15 @@ VERSION = "v0.1.0"
 menu_options = [
     [  # Global commands (0)
         {"key": "h", "command": "Help", "status": 1},
-        {"key": "e", "command": "Exit", "status": 1},
+        {"key": "q", "command": "Exit", "status": 1},
         ### Hidden globals
         {"key": "help", "command": "h_help", "status": -1},
         {"key": "clear", "command": "h_clear", "status": -1},
         {"key": "exit", "command": "h_exit", "status": -1},
     ],
     [  # Main menu (1)
-        {"key": "c", "command": "Connect to CIVIC Server", "status": 1},
-        {"key": "mc", "command": "Manage Citizens", "status": 1},
+        {"key": "c", "command": "Manage Citizens", "status": 1},
+        {"key": "m", "command": "Manage Models", "status": 1},
     ],
     [  # Manage Citizens (2)
         {"key": "l", "command": "List Citizens", "status": 1},
@@ -34,9 +34,16 @@ menu_options = [
         {"key": "d", "command": "Delete Citizen", "status": 1},
         {"key": "b", "command": "Back", "status": 1},
     ],
+    [  # Manage Models (3)
+        {"key": "l", "command": "List Models", "status": 1},
+        {"key": "d", "command": "Download Model", "status": 1},
+        {"key": "b", "command": "Back", "status": 1},
+    ],
 ]
-menu_states = Enum("Menu", ["GLOBAL", "MAIN", "MANAGE_CITIZENS"], start=0)
-menu_state_titles = ["Global Commands", "Main Menu", "Manage Citizens"]
+menu_states = Enum(
+    "Menu", ["GLOBAL", "MAIN", "MANAGE_CITIZENS", "MANAGE_MODELS"], start=0
+)
+menu_state_titles = ["Global Commands", "Main Menu", "Manage Citizens", "Manage Models"]
 curr_menu = menu_states.MAIN
 
 
@@ -54,45 +61,100 @@ def main():
 
         ### Global commands (0)
 
-        if any(choice == item["key"] for item in menu_options[0]):
-            match choice:
-                case "h":
-                    print_menu(curr_menu)
-                case "e":
-                    safe_exit()
-                # Hidden commands
-                case "help":
-                    print_menu(curr_menu)
-                case "exit":
-                    safe_exit()
-                case "clear":
-                    os.system("clear")
+        if choice in [item["key"] for item in menu_options[menu_states.GLOBAL.value]]:
+            if any(
+                choice == item["key"] and item["status"]
+                for item in menu_options[menu_states.GLOBAL.value]
+            ):
+                match choice:
+                    case "h":
+                        print_menu(curr_menu)
+                    case "q":
+                        safe_exit()
+                    # Hidden commands
+                    case "help":
+                        print_menu(curr_menu)
+                    case "exit":
+                        safe_exit()
+                    case "clear":
+                        os.system("clear")
+            else:
+                if any(
+                    choice == item["key"]
+                    for item in menu_options[menu_states.GLOBAL.value]
+                ):
+                    print_error("Command currently disabled. Please try again.")
+                else:
+                    print_error("Command not recognized. Please try again.")
 
         ### Main Menu (1)
 
         elif curr_menu == menu_states.MAIN:
-            match choice:
-                case "c":
-                    print("Connecting to CIVIC Server...\n")  # TODO
-                case "mc":
-                    set_curr_menu(menu_states.MANAGE_CITIZENS)
-                case _:
-                    print_error("Invalid command. Please try again.")
+            if any(
+                choice == item["key"] and item["status"]
+                for item in menu_options[menu_states.MAIN.value]
+            ):
+                match choice:
+                    case "c":
+                        set_curr_menu(menu_states.MANAGE_CITIZENS)
+                    case "m":
+                        set_curr_menu(menu_states.MANAGE_MODELS)
+            else:
+                if any(
+                    choice == item["key"]
+                    for item in menu_options[menu_states.MAIN.value]
+                ):
+                    print_error("Command currently disabled. Please try again.")
+                else:
+                    print_error("Command not recognized. Please try again.")
 
         ### Manage Citizens (2)
 
         elif curr_menu == menu_states.MANAGE_CITIZENS:
-            match choice:
-                case "l":
-                    print("Listing Citizens...\n")  # TODO
-                case "c":
-                    print("Creating Citizen...\n")  # TODO
-                case "d":
-                    print("Deleting Citizen...\n")  # TODO
-                case "b":
-                    set_curr_menu(menu_states.MAIN)
-                case _:
-                    print_error("Invalid command. Please try again.")
+            if any(
+                choice == item["key"] and item["status"]
+                for item in menu_options[menu_states.MANAGE_CITIZENS.value]
+            ):
+                match choice:
+                    case "l":
+                        print("Listing Citizens...\n")  # TODO
+                    case "c":
+                        print("Creating Citizen...\n")  # TODO
+                    case "d":
+                        print("Deleting Citizen...\n")  # TODO
+                    case "b":
+                        set_curr_menu(menu_states.MAIN)
+            else:
+                if any(
+                    choice == item["key"]
+                    for item in menu_options[menu_states.MANAGE_CITIZENS.value]
+                ):
+                    print_error("Command currently disabled. Please try again.")
+                else:
+                    print_error("Command not recognized. Please try again.")
+
+        ### Manage Models (3)
+
+        elif curr_menu == menu_states.MANAGE_MODELS:
+            if any(
+                choice == item["key"] and item["status"]
+                for item in menu_options[menu_states.MANAGE_MODELS.value]
+            ):
+                match choice:
+                    case "l":
+                        print("Listing Models...\n")
+                    case "d":
+                        print("Downloading Model...\n")
+                    case "b":
+                        set_curr_menu(menu_states.MAIN)
+            else:
+                if any(
+                    choice == item["key"]
+                    for item in menu_options[menu_states.MANAGE_MODELS.value]
+                ):
+                    print_error("Command currently disabled. Please try again.")
+                else:
+                    print_error("Command not recognized. Please try again.")
 
 
 def set_curr_menu(menu_index):
