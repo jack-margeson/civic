@@ -51,6 +51,19 @@ services:
       civic-network:
         ipv4_address: 172.20.0.5
 
+  internal-server:
+    build:
+      context: ./internal-server
+      dockerfile: Dockerfile
+    image: civic-internal-server:latest
+    container_name: civic-internal-server
+    restart: always
+    ports:
+      - 24842:24842
+    networks:
+      civic-network:
+        ipv4_address: 172.20.0.6
+
 volumes:
   civic-db:
     name: civic-db

@@ -5,14 +5,13 @@
 # stores data in postgresql database through the middleware server
 
 import os
-import argparse
+import json
 import requests
 import docker
-import time
-import json
 from colorama import Fore, Style, init
 from enum import Enum
 import signal
+import prettytable
 
 VERSION = "v0.1.0"
 
@@ -39,6 +38,8 @@ curr_menu = menu_states.MAIN
 # Get the Docker client
 docker_host = os.getenv("DOCKER_HOST_OVERRIDE", "unix://var/run/docker.sock")
 client = docker.DockerClient(base_url=docker_host)
+
+middleware_url = "http://localhost:5000"
 
 
 def main():
@@ -174,6 +175,13 @@ def print_error(message):
     print(Fore.RED + message + Style.RESET_ALL + "\n")
 
 
+def print_table(data):
+    headers = list(data[0].keys())
+    data.insert(0, headers)
+    table = prettytable.from_json(json.dumps(data))
+    print(table, "\n")
+
+
 def init_server_manager():
     global client  # Docker client
     print("Initializing server manager...")
@@ -205,6 +213,11 @@ def install_civic_server():
     )
     client.images.build(path="./sql", dockerfile="Dockerfile", tag="civic-db:latest")
     client.images.pull("adminer", tag="latest")
+    client.images.build(
+        path="./internal_server",
+        dockerfile="Dockerfile",
+        tag="civic-internal-server:latest",
+    )
 
     # Create the network
     print("Creating network...")
@@ -224,19 +237,6 @@ def install_civic_server():
 
     # Create and start the containers
     print("Creating and starting containers...")
-    client.containers.run(
-        "civic-middleware:latest",
-        name="civic-middleware",
-        ports={"5000/tcp": 5000},
-        restart_policy={"Name": "always"},
-        environment={
-            "POSTGRES_USER": "civic_db_admin",
-            "POSTGRES_PASSWORD": os.getenv("POSTGRES_PASSWORD"),
-        },
-        network="civic-network",
-        networking_config={"ipv4_address": "172.20.0.3"},
-        detach=True,
-    )
 
     client.containers.run(
         "civic-db:latest",
@@ -263,7 +263,19 @@ def install_civic_server():
             "retries": 5,
         },
         network="civic-network",
-        networking_config={"ipv4_address": "172.20.0.4"},
+        detach=True,
+    )
+
+    client.containers.run(
+        "civic-middleware:latest",
+        name="civic-middleware",
+        ports={"5000/tcp": 5000},
+        restart_policy={"Name": "always"},
+        environment={
+            "POSTGRES_USER": "civic_db_admin",
+            "POSTGRES_PASSWORD": os.getenv("POSTGRES_PASSWORD"),
+        },
+        network="civic-network",
         detach=True,
     )
 
@@ -273,7 +285,15 @@ def install_civic_server():
         ports={"8080/tcp": 8080},
         restart_policy={"Name": "always"},
         network="civic-network",
-        networking_config={"ipv4_address": "172.20.0.5"},
+        detach=True,
+    )
+
+    client.containers.run(
+        "civic-internal-server:latest",
+        name="civic-internal-server",
+        ports={"24842/tcp": 24842},
+        restart_policy={"Name": "always"},
+        network="civic-network",
         detach=True,
     )
 
@@ -299,6 +319,7 @@ def uninstall_civic_server(quiet=False):
             "civic-middleware",
             "civic-db",
             "civic-adminer",
+            "civic-internal-server",
         ]:
             container.stop()
             container.remove(force=True)
@@ -318,11 +339,15 @@ def uninstall_civic_server(quiet=False):
     if not quiet:
         print("Deleting images...")
     for image in client.images.list():
-        if image.tags == ["civic-middleware:latest", "civic-db:latest"]:
+        if image.tags == [
+            "civic-middleware:latest",
+            "civic-db:latest",
+            "civic-internal-server:latest",
+        ]:
             client.images.remove(image.id)
 
     if not quiet:
-        print(Fore.GREEN + "CIVIC Server uninstalled." + Style.RESET_ALL)
+        print(Fore.RED + "CIVIC Server uninstalled.\n" + Style.RESET_ALL)
 
     # Enable "Install CIVIC Server" option
     menu_options[1][0]["status"] = 1
@@ -331,7 +356,10 @@ def uninstall_civic_server(quiet=False):
 
 
 def list_models():
-    print("Listing models...")  # TODO
+    print("Modules:")
+    response = requests.get(f"{middleware_url}/get_models")
+    response.raise_for_status()
+    print_table(response.json())
 
 
 def manage_models():
