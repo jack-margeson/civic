@@ -52,7 +52,7 @@ def main():
     print_menu(curr_menu)
 
     while True:
-        choice = input("$ ").lower()
+        choice = input("$ ").lower().strip()
 
         ### Global commands (0)
 
@@ -188,7 +188,8 @@ def init_server_manager():
 
     # Check if the CIVIC server is running
     running = all(
-        container.name in ["civic-middleware", "civic-db", "civic-adminer"]
+        container.name
+        in ["civic-internal-server", "civic-middleware", "civic-db", "civic-adminer"]
         for container in client.containers.list()
     )
     if running:
@@ -313,7 +314,7 @@ def uninstall_civic_server(quiet=False):
     # Stop and remove the containers
     if not quiet:
         print("Stopping and removing containers...")
-    for container in client.containers.list():
+    for container in client.containers.list(all=True):
         if container.name in [
             "civic-server",
             "civic-middleware",
@@ -338,7 +339,7 @@ def uninstall_civic_server(quiet=False):
     # Delete the images
     if not quiet:
         print("Deleting images...")
-    for image in client.images.list():
+    for image in client.images.list(all=True):
         if image.tags == [
             "civic-middleware:latest",
             "civic-db:latest",
