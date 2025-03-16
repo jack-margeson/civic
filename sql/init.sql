@@ -17,6 +17,31 @@ CREATE TABLE models (
     status INTEGER NOT NULL DEFAULT 1 -- 0: inactive, 1: active
 ); 
 
+CREATE TABLE clients (
+    id SERIAL PRIMARY KEY,
+    client_uuid UUID UNIQUE DEFAULT gen_random_uuid(),
+    ip VARCHAR(255) NOT NULL,
+    port INTEGER NOT NULL,
+    status INTEGER NOT NULL DEFAULT 0, -- 0: inactive, 1: active
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_connected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE OR REPLACE FUNCTION update_last_connected_at() RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.status = 1 THEN
+        NEW.last_connected_at = CURRENT_TIMESTAMP;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER before_client_update
+BEFORE UPDATE ON clients
+FOR EACH ROW
+WHEN (OLD.status IS DISTINCT FROM NEW.status)
+EXECUTE FUNCTION update_last_connected_at();
+
 CREATE TABLE model_binaries (
     id SERIAL PRIMARY KEY,
     model_id INTEGER NOT NULL REFERENCES models(model_id),
@@ -55,6 +80,7 @@ EXECUTE FUNCTION create_model_related_tables();
 
 
 -- CREATE EXAMPLE MODEL 
+
 INSERT INTO models (model_id, name, display_name, description) VALUES (1, 'hello', 'Hello World', 'A simple hello world model');    
 INSERT INTO model_binaries (model_id, version, binary_data) VALUES (1, 1, pg_read_binary_file('/docker-entrypoint-initdb.d/binary_testing/hello.o')
 );

@@ -120,11 +120,11 @@ def main():
                     case "l":
                         list_models()
                     case "a":
-                        print("Create Model")
+                        print("Create Model")  # TODO
                     case "e":
-                        print("Edit Model")
+                        print("Edit Model")  # TODO
                     case "d":
-                        print("Delete Model")
+                        print("Delete Model")  # TODO
             else:
                 if any(
                     choice == item["key"]

@@ -264,10 +264,13 @@ def create_citizen():
         detach=True,
         environment={"CIVIC_SERVER_IP": ip, "CIVIC_SERVER_PORT": port},
     )
+    update_citizen_list()
 
 
 def list_citizens():
     print("Listing citizens...")
+    update_citizen_list()
+
     # List all running containers
     citizen_obj = []
     for container in citizen_containers:
@@ -278,8 +281,11 @@ def list_citizens():
                 "status": container.status,
             }
         )
-    citizen_obj.sort(key=lambda x: x["id"])
-    print_table(citizen_obj)
+    if citizen_obj:
+        citizen_obj.sort(key=lambda x: x["id"])
+        print_table(citizen_obj)
+    else:
+        print("No citizens found.\n")
 
 
 def delete_citizen():

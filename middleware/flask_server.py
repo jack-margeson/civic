@@ -9,11 +9,12 @@
 import os
 import json
 from waitress import serve
-from flask import Flask, Response, jsonify
+from flask import Flask, Response, request
 from flask_cors import CORS, cross_origin
 import logging
 import psycopg2
-from psycopg2 import sql
+
+# from psycopg2 import sql
 import signal
 import sys
 
@@ -38,6 +39,44 @@ def get_models():
     return db_query("SELECT * FROM models")
 
 
+@app.route("/clients", methods=["POST"])
+@cross_origin()
+def add_client():
+    return db_query(
+        "WITH ins AS (INSERT INTO clients (ip, port, status) VALUES ('"
+        + request.json["ip"]
+        + "', "
+        + str(request.json["port"])
+        + ", 1) RETURNING *) SELECT * FROM ins;"
+    )
+
+
+@app.route("/clients/<client_uuid>/deactivate", methods=["PUT"])
+@cross_origin()
+def deactivate_client(client_uuid):
+    return db_query(
+        "WITH upd AS (UPDATE clients SET status = 0 WHERE client_uuid = '"
+        + client_uuid
+        + "' RETURNING *) SELECT * FROM upd;"
+    )
+
+
+@app.route("/clients/<client_uuid>/activate", methods=["PUT"])
+@cross_origin()
+def activate_client(client_uuid):
+    return db_query(
+        "WITH upd AS (UPDATE clients SET status = 1 WHERE client_uuid = '"
+        + client_uuid
+        + "' RETURNING *) SELECT * FROM upd;"
+    )
+
+
+@app.route("/clients", methods=["GET"])
+@cross_origin()
+def get_clients():
+    return db_query("SELECT * FROM clients")
+
+
 def conn_db():
     global db
     db = psycopg2.connect(
@@ -56,8 +95,8 @@ def db_query(query):
     # Execute query
     app.logger.info(f"Executing query: {query}")
     cur.execute(query)
-    col_names = [desc[0] for desc in cur.description]
-    rows = cur.fetchall()
+    col_names = [desc[0] for desc in cur.description] if cur.description else []
+    rows = cur.fetchall() if cur.description else []
 
     # Close cursor
     cur.close()
@@ -68,12 +107,12 @@ def db_query(query):
         result.append(dict(zip(col_names, row)))
 
     # Return result
-    result = json.dumps(result, sort_keys=False)
+    result = json.dumps(result, sort_keys=False, default=str)
     app.logger.info(f"Query result: {result}")
     return Response(result, mimetype="application/json")
 
 
-def safe_exit(*args):
+def safe_exit(*_):
     if db:
         db.close()
     app.logger.info("Exiting...")

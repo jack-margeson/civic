@@ -10,6 +10,8 @@ logging.basicConfig(level=logging.INFO)
 CIVIC_SERVER_IP = ""
 CIVIC_SERVER_PORT = ""
 
+CLIENT_UUID = None
+
 s = None
 listener_thread = None
 
@@ -29,6 +31,13 @@ def configure():
         logging.fatal("CIVIC_SERVER_IP and CIVIC_SERVER_PORT must be set.")
         sys.exit(1)
 
+    # Load the client's UUID from a file if it exists
+    if os.path.exists("citizen_uuid"):
+        with open("citizen_uuid", "r") as uuid_file:
+            global CLIENT_UUID
+            CLIENT_UUID = uuid_file.read().strip()
+            logging.info(f"Loaded client UUID: {CLIENT_UUID}")
+
 
 def connect_to_server():
     global s, listener_thread
@@ -42,9 +51,12 @@ def connect_to_server():
         s.connect((CIVIC_SERVER_IP, int(CIVIC_SERVER_PORT)))
         logging.info("Successfully connected to the server.")
 
-        # Send a ping message
-        s.sendall(b"ping")
-        logging.info("Ping message sent to the server.")
+        if CLIENT_UUID:
+            logging.info(f"Sending pre-established UUID to server: {CLIENT_UUID}")
+            s.sendall(f"UUID {CLIENT_UUID}".encode("utf-8"))
+        else:
+            logging.info("Requesting a new UUID from the server...")
+            s.sendall("UUID -1".encode("utf-8"))
 
         # Start a thread to listen for messages from the server
         listener_thread = threading.Thread(target=listen_for_messages, daemon=True)
@@ -59,11 +71,18 @@ def listen_for_messages():
     while True:
         try:
             response = s.recv(1024)
+
             if response:
                 decoded_response = response.decode()
                 logging.info(f"Received response from server: {decoded_response}")
+                if decoded_response.startswith("UUID "):
+                    client_uuid = decoded_response.split(" ")[1]
+                    logging.info(f"Client UUID: {client_uuid}")
+                    with open("citizen_uuid", "w") as uuid_file:
+                        uuid_file.write(client_uuid)
                 if decoded_response == "Server is shutting down":
                     safe_exit()
+
             else:
                 safe_exit()
         except socket.error as e:
