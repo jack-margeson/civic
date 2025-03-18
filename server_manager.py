@@ -27,17 +27,32 @@ menu_options = [
     [  # Main menu (1)
         {"key": "i", "command": "Install CIVIC Server", "status": 1},
         {"key": "u", "command": "Uninstall CIVIC Server", "status": 1},
-        {"key": "m", "command": "Manage Models", "status": 1},
+        {"key": "ms", "command": "Manage CIVIC Server", "status": 1},
+        {"key": "mm", "command": "Manage Models", "status": 1},
     ],
-    [  # Manage models (2)
-        {"key": "l", "command": "List Models", "status": 1},
-        {"key": "a", "command": "Create Model", "status": 1},
+    [  # Manage server (2)
+        {"key": "a", "command": "Attach to Server", "status": 1},
+        {"key": "lcc", "command": "List Connected Citizens", "status": 1},
+        {"key": "lac", "command": "List All Citizens", "status": 1},
+        {"key": "b", "command": "Back", "status": 1},
+    ],
+    [  # Manage models (3)
+        {"key": "lm", "command": "List Models", "status": 1},
+        {"key": "c", "command": "Create Model", "status": 1},
         {"key": "e", "command": "Edit Model", "status": 1},
         {"key": "d", "command": "Delete Model", "status": 1},
+        {"key": "b", "command": "Back", "status": 1},
     ],
 ]
-menu_states = Enum("Menu", ["GLOBAL", "MAIN", "MANAGE_MODELS"], start=0)
-menu_state_titles = ["Global Commands", "Main Menu", "Manage Models"]
+menu_states = Enum(
+    "Menu", ["GLOBAL", "MAIN", "MANAGE_SERVER", "MANAGE_MODELS"], start=0
+)
+menu_state_titles = [
+    "Global Commands",
+    "Main Menu",
+    "Manage CIVIC Server",
+    "Manage Models",
+]
 curr_menu = menu_states.MAIN
 
 # Get the Docker client
@@ -99,7 +114,9 @@ def main():
                         install_civic_server()
                     case "u":
                         uninstall_civic_server()
-                    case "m":
+                    case "ms":
+                        set_curr_menu(menu_states.MANAGE_SERVER)
+                    case "mm":
                         set_curr_menu(menu_states.MANAGE_MODELS)
             else:
                 if any(
@@ -110,21 +127,47 @@ def main():
                 else:
                     print_error("Command not recognized. Please try again.")
 
-        ### Manage Models (2)
+        ### Manage Server (2)
+        elif curr_menu == menu_states.MANAGE_SERVER:
+            if any(
+                choice == item["key"] and item["status"]
+                for item in menu_options[menu_states.MANAGE_SERVER.value]
+            ):
+                match choice:
+                    case "a":
+                        attach_to_server()
+                    case "lcc":
+                        list_connected_clients()
+                    case "lac":
+                        list_all_clients()
+                    case "b":
+                        set_curr_menu(menu_states.MAIN)
+            else:
+                if any(
+                    choice == item["key"]
+                    for item in menu_options[menu_states.MANAGE_SERVER.value]
+                ):
+                    print_error("Command currently disabled. Please try again.")
+                else:
+                    print_error("Command not recognized. Please try again.")
+
+        ### Manage Models (3)
         elif curr_menu == menu_states.MANAGE_MODELS:
             if any(
                 choice == item["key"] and item["status"]
                 for item in menu_options[menu_states.MANAGE_MODELS.value]
             ):
                 match choice:
-                    case "l":
+                    case "lm":
                         list_models()
-                    case "a":
+                    case "c":
                         print("Create Model")  # TODO
                     case "e":
                         print("Edit Model")  # TODO
                     case "d":
                         print("Delete Model")  # TODO
+                    case "b":
+                        set_curr_menu(menu_states.MAIN)
             else:
                 if any(
                     choice == item["key"]
@@ -209,6 +252,27 @@ def print_table(data):
     print(table, "\n")
 
 
+def update_menu_state(installed=False):
+    if installed:
+        # Disable "Install CIVIC Server" option
+        menu_options[1][0]["status"] = 0
+        # Enable "Uninstall CIVIC Server" option
+        menu_options[1][1]["status"] = 1
+        # Enable "Manage Server" option
+        menu_options[1][2]["status"] = 1
+        # Enable "Manage Models" option
+        menu_options[1][3]["status"] = 1
+    else:
+        # Enable "Install CIVIC Server" option
+        menu_options[1][0]["status"] = 1
+        # Disable "Uninstall CIVIC Server" option
+        menu_options[1][1]["status"] = 0
+        # Disable "Manage Server" option
+        menu_options[1][2]["status"] = 0
+        # Disable "Manage Models" option
+        menu_options[1][3]["status"] = 0
+
+
 def init_server_manager():
     global client  # Docker client
     print("Initializing server manager...")
@@ -219,14 +283,7 @@ def init_server_manager():
         for container in client.containers.list(all=True)
     )
 
-    if running:
-        # Disable "Install CIVIC Server" option
-        menu_options[1][0]["status"] = 0
-    else:
-        # Disable "Uninstall CIVIC Server" option
-        menu_options[1][1]["status"] = 0
-        # Disable "Manage Models" option
-        menu_options[1][2]["status"] = 0
+    update_menu_state(running)
 
 
 def install_civic_server():
@@ -322,19 +379,15 @@ def install_civic_server():
         "civic-internal-server:latest",
         name="civic-internal-server",
         ports={"24842/tcp": 24842},
-        restart_policy={"Name": "always"},
         network="civic-network",
+        tty=True,
+        stdin_open=True,
         detach=True,
     )
 
     print(Fore.GREEN + "CIVIC Server installed!\n" + Style.RESET_ALL)
 
-    # Disable "Install CIVIC Server" option
-    menu_options[1][0]["status"] = 0
-    # Enable "Uninstall CIVIC Server" option
-    menu_options[1][1]["status"] = 1
-    # Enable "Manage Models" option
-    menu_options[1][2]["status"] = 1
+    update_menu_state(True)
 
 
 def uninstall_civic_server(quiet=False):
@@ -381,17 +434,38 @@ def uninstall_civic_server(quiet=False):
     if not quiet:
         print(Fore.RED + "CIVIC Server uninstalled.\n" + Style.RESET_ALL)
 
-    # Enable "Install CIVIC Server" option
-    menu_options[1][0]["status"] = 1
-    # Disable "Uninstall CIVIC Server" option
-    menu_options[1][1]["status"] = 0
-    # Disable "Manage Models" option
-    menu_options[1][2]["status"] = 0
+    update_menu_state(False)
 
 
 def list_models():
     print("Modules:")
     response = requests.get(f"{middleware_url}/get_models")
+    response.raise_for_status()
+    print_table(response.json())
+
+
+def attach_to_server():
+    print("Attaching to the server. Press Ctrl+D to detach.")
+    try:
+        os.system('docker attach civic-internal-server --detach-keys="ctrl-d"')
+        # FOLLOWING CODE WILL EXECUTE AFTER DETACHING
+        # Reset terminal colors and clear the screen
+        os.system("tput sgr0")
+        print_menu(curr_menu, header=False, clear=True)
+    except Exception as e:
+        print_error(f"Failed to attach to the server: {e}")
+
+
+def list_connected_clients():
+    print("Connected citizens:")
+    response = requests.get(f"{middleware_url}/clients")
+    response.raise_for_status()
+    print_table(response.json())
+
+
+def list_all_clients():
+    print("All citizens:")
+    response = requests.get(f"{middleware_url}/clients")
     response.raise_for_status()
     print_table(response.json())
 

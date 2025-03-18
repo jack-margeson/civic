@@ -26,7 +26,7 @@ menu_options = [
         {"key": "c", "command": "Manage Citizens", "status": 1},
     ],
     [  # Manage Citizens (2)
-        {"key": "l", "command": "List Citizens", "status": 1},
+        {"key": "lc", "command": "List Citizens", "status": 1},
         {"key": "c", "command": "Create Citizen", "status": 1},
         {"key": "st", "command": "Start Citizen", "status": 1},
         {"key": "sp", "command": "Stop Citizen", "status": 1},
@@ -112,7 +112,7 @@ def main():
                 for item in menu_options[menu_states.MANAGE_CITIZENS.value]
             ):
                 match choice:
-                    case "l":
+                    case "lc":
                         list_citizens()
                     case "c":
                         create_citizen()

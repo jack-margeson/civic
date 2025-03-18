@@ -57,7 +57,8 @@ services:
       dockerfile: Dockerfile
     image: civic-internal-server:latest
     container_name: civic-internal-server
-    restart: always
+    tty: true
+    stdin_open: true
     ports:
       - 24842:24842
     networks:
