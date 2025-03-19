@@ -6,6 +6,8 @@ import curses
 import requests
 import time
 import os
+import json
+import prettytable
 
 middleware_url = "http://civic-middleware:5000"
 
@@ -72,7 +74,7 @@ class CIVICServer:
                     if command.lower() in ["exit", "quit", "q"]:
                         logging.info("To deattach from the server console, use Ctrl+D.")
                     elif command.lower() in ["clients", "citizens", "lc"]:
-                        logging.info(f"Connected citizens: {list(self.clients.keys())}")
+                        self.list_clients()
                     elif command.lower() == "shutdown":
                         os.kill(os.getpid(), signal.SIGINT)
                     else:
@@ -244,6 +246,21 @@ class CIVICServer:
 
         curses.endwin()
         exit(0)
+
+    def print_table(self, data):
+        headers = list(data[0].keys())
+        data.insert(0, headers)
+        table = prettytable.from_json(json.dumps(data))
+        logging.info(table)
+
+    ### SERVER COMMANDS ###
+
+    def list_clients(self, all_clients=True):
+        # TODO: Implement all_clients functionality--another endpoint?
+        logging.info("Listing clients...")
+        response = requests.get(f"{middleware_url}/clients")
+        response.raise_for_status()
+        self.print_table(response.json())
 
 
 def main(stdscr):
