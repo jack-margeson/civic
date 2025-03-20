@@ -16,12 +16,24 @@ class CursesLoggerHandler(logging.Handler):
     def __init__(self, stdscr):
         super().__init__()
         self.stdscr = stdscr
+        self.log_pad = curses.newpad(
+            1000, curses.COLS
+        )  # Create a pad with a large height
+        self.log_pad_pos = 0  # Track the current scroll position
 
     def emit(self, record):
         try:
             msg = self.format(record)
-            self.stdscr.addstr(msg + "\n")
-            self.stdscr.refresh()
+            try:
+                self.log_pad.addstr(self.log_pad_pos, 0, msg + "\n")
+                self.log_pad_pos += 1
+                # Ensure the pad scrolls up when the bottom is reached
+                max_y, max_x = self.stdscr.getmaxyx()
+                self.log_pad.refresh(
+                    max(0, self.log_pad_pos - max_y + 1), 0, 0, 0, max_y - 1, max_x - 1
+                )
+            except curses.error:
+                pass  # Ignore curses errors caused by terminal size or cursor issues
         except Exception:
             self.handleError(record)
 
@@ -30,28 +42,43 @@ class CIVICServer:
     def __init__(self, stdscr, host="0.0.0.0", port=24842):
         self.stdscr = stdscr
         self.server_running = False
-
         self.host = host
         self.port = port
         self.clients = {}
-
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind((self.host, self.port))
-        self.server_socket.listen(5)
-
+        self.logger_handler = None
+        self.server_socket = None
         self.server_command_thread = None
 
+        # Init. the server
+        self.init_server()
+
+    def init_server(self):
+        # Create a "download" folder if it doesn't exist
+        if not os.path.exists("download"):
+            os.makedirs("download")
+
+        # Set up logging
         self.logger_handler = CursesLoggerHandler(self.stdscr)
         logging.getLogger().addHandler(self.logger_handler)
         logging.getLogger().setLevel(logging.INFO)
 
+        # Start the server
         self.server_running = True
+        # Make and open the server socket
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.bind((self.host, self.port))
+        self.server_socket.listen(5)
         logging.info(f"Server started on {self.host}:{self.port}")
 
+    # TODO: curses stdscr REALLY doesn't work well with Docker. It's a pain to get it to work.
+    # The problem is that the terminal size is detected for the container, but when attaching
+    # to the container, the terminal size is different. This causes the curses pad to be the wrong size.
+    # I've tried a few different solutions, but none have worked well. I'm going to leave this as is for now.
     def handle_server_commands(self):
         try:
             curses.curs_set(1)
-            input_win = curses.newwin(1, curses.COLS, curses.LINES - 1, 0)
+            max_y, max_x = self.stdscr.getmaxyx()
+            input_win = curses.newwin(1, max_x, max_y - 1, 0)
             input_win.timeout(100)  # Set a timeout of 100ms for non-blocking input
         except curses.error as e:
             logging.error(f"Curses initialization error: {e}")
@@ -59,7 +86,7 @@ class CIVICServer:
 
         command_buffer = ""
         while self.server_running:
-            input_win.clear()
+            input_win.erase()
             input_win.addstr(0, 0, f"$ {command_buffer}")
             input_win.refresh()
             try:
@@ -71,15 +98,47 @@ class CIVICServer:
                 elif key in (10, 13):  # Handle Enter key
                     command = command_buffer.strip()
                     command_buffer = ""
-                    if command.lower() in ["exit", "quit", "q"]:
-                        logging.info("To deattach from the server console, use Ctrl+D.")
-                    elif command.lower() in ["clients", "citizens", "lc"]:
+                    if not command:
+                        continue
+
+                    args = command.split()
+                    cmd = args[0].lower()
+                    cmd_args = args[1:]
+
+                    if cmd in ["help", "h"]:
+                        logging.info("Available commands:")
+                        logging.info("  clients - List all connected clients.")
+                        logging.info("  models - List all available models.")
+                        logging.info(
+                            "  download <model_id> - Download a model's binary by its ID."
+                        )
+                        logging.info("  shutdown - Shut down the server.")
+                    elif cmd in ["exit", "quit", "q"]:
+                        logging.info("To detach from the server console, use Ctrl+D.")
+                    elif cmd in ["clients", "citizens", "lc"]:
                         self.list_clients()
-                    elif command.lower() == "shutdown":
+                    elif cmd in ["models", "lm"]:
+                        self.list_models()
+                    elif cmd == "download":
+                        if not cmd_args:
+                            logging.info("Usage: download <model_id>")
+                            continue
+                        model_id = cmd_args[0]
+                        self.download_binary(model_id)
+                    elif cmd == "distribute":
+                        if len(cmd_args) < 3:
+                            logging.info(
+                                "Usage: distribute <model_id> <range_start> <range_end>"
+                            )
+                            continue
+                        model_id = cmd_args[0]
+                        range_start = int(cmd_args[1])
+                        range_end = int(cmd_args[2])
+                        self.distribute_binary(model_id, range_start, range_end)
+                    elif cmd == "shutdown":
                         os.kill(os.getpid(), signal.SIGINT)
                     else:
-                        if command != "":
-                            logging.info(f"Command not recognized: {command}")
+                        logging.info(f"Command not recognized: {command}")
                 else:
                     command_buffer += chr(key)
             except Exception as e:
@@ -251,7 +310,8 @@ class CIVICServer:
         headers = list(data[0].keys())
         data.insert(0, headers)
         table = prettytable.from_json(json.dumps(data))
-        logging.info(table)
+        for line in str(table).splitlines():
+            logging.info(line)
 
     ### SERVER COMMANDS ###
 
@@ -260,7 +320,91 @@ class CIVICServer:
         logging.info("Listing clients...")
         response = requests.get(f"{middleware_url}/clients")
         response.raise_for_status()
-        self.print_table(response.json())
+        if response.json():
+            self.print_table(response.json())
+        else:
+            logging.info("No clients found.")
+
+    def list_models(self, all_models=True):
+        logging.info("Listing models...")
+        response = requests.get(f"{middleware_url}/get_models")
+        response.raise_for_status()
+        if response.json():
+            self.print_table(response.json())
+        else:
+            logging.info("No models found.")
+
+    def download_binary(self, model_id):
+        try:
+            response = requests.get(
+                f"{middleware_url}/download_binary/{model_id}", stream=True
+            )
+            response.raise_for_status()
+
+            # Save the model binary to a file
+            file_path = os.path.join("download", f"model_{model_id}.bin")
+            with open(file_path, "wb") as model_file:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        model_file.write(chunk)
+
+            logging.info(f"Model {model_id} downloaded successfully to {file_path}")
+        except requests.RequestException as e:
+            logging.error(f"Failed to download model {model_id}: {e}")
+
+    def distribute_binary(self, model_id, range_start, range_end):
+        # Given a model ID and a range of clients, distribute the model binary to those clients
+        try:
+            # Check if the model binary exists
+            file_path = os.path.join("download", f"model_{model_id}.bin")
+            if not os.path.exists(file_path):
+                logging.warning(
+                    f"Model binary for {model_id} not found. Please download it first."
+                )
+                return
+
+            if self.clients:
+                # Validate range
+                if range_start < 0 or range_end >= len(self.clients):
+                    logging.warning(
+                        "Invalid range. Please provide a valid range of clients."
+                    )
+                    return
+
+                # Get the list of clients within the specified range
+                client_list = list(self.clients.items())[range_start : range_end + 1]
+
+                # Read the model binary
+                with open(file_path, "rb") as model_file:
+                    model_data = model_file.read()
+
+                # Distribute the model binary to the selected clients
+                for client_uuid, client_socket in client_list:
+                    try:
+                        # Send the model ID and binary size first
+                        binary_size = len(model_data)
+                        client_socket.sendall(
+                            f"MODEL_BIN {model_id} {binary_size}".encode("utf-8")
+                        )
+
+                        # Send the binary data in chunks
+                        chunk_size = 8192
+                        for i in range(0, binary_size, chunk_size):
+                            client_socket.sendall(model_data[i : i + chunk_size])
+
+                        logging.info(
+                            f"Model {model_id} binary distributed to client {client_uuid}"
+                        )
+                    except Exception as e:
+                        logging.error(
+                            f"Failed to send model {model_id} to client {client_uuid}: {e}"
+                        )
+            else:
+                logging.warning("No clients connected to distribute the model to.")
+                return
+
+        except requests.RequestException as e:
+            logging.error(f"Failed to distribute model {model_id}: {e}")
 
 
 def main(stdscr):

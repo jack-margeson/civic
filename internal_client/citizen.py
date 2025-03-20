@@ -5,7 +5,7 @@ import threading
 import os
 import signal
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 CIVIC_SERVER_IP = ""
 CIVIC_SERVER_PORT = ""
@@ -37,6 +37,9 @@ def configure():
             global CLIENT_UUID
             CLIENT_UUID = uuid_file.read().strip()
             logging.info(f"Loaded client UUID: {CLIENT_UUID}")
+
+    # Create a download directory if it doesn't exist
+    os.makedirs("download", exist_ok=True)
 
 
 def connect_to_server():
@@ -80,6 +83,8 @@ def listen_for_messages():
                     logging.info(f"Client UUID: {client_uuid}")
                     with open("citizen_uuid", "w") as uuid_file:
                         uuid_file.write(client_uuid)
+                if decoded_response.startswith("MODEL_BIN"):
+                    download_binary(decoded_response)
                 if decoded_response == "Server is shutting down":
                     safe_exit()
 
@@ -88,6 +93,37 @@ def listen_for_messages():
         except socket.error as e:
             logging.error(f"Socket error: {e}")
             break
+
+
+def download_binary(decoded_response):
+    global s
+
+    logging.info("Downloading model binary from the server...")
+    model_id, binary_size = decoded_response.split(" ")[1:3]
+    binary_size = int(binary_size)
+    model_data = b""
+
+    received_size = 0
+    while received_size < binary_size:
+        chunk = s.recv(8192)
+        if not chunk:
+            logging.error("Connection lost while downloading binary.")
+            return
+        model_data += chunk
+        received_size += len(chunk)
+        logging.debug(f"Received {received_size}/{binary_size} bytes")
+
+    # Save the received model binary to a file
+    file_path = os.path.join("download", f"model_{model_id}.bin")
+    with open(file_path, "wb") as model_file:
+        model_file.write(model_data)
+
+    # Make the file executable
+    os.chmod(file_path, 0o755)
+
+    logging.info(
+        f"Model {model_id} binary received from the server and saved to {file_path}"
+    )
 
 
 def safe_exit(*args):

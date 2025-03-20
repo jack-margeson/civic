@@ -71,6 +71,22 @@ def activate_client(client_uuid):
     )
 
 
+@app.route("/download_binary/<int:model_id>", methods=["GET"])
+@cross_origin()
+def download_binary(model_id):
+    query = f"SELECT binary_data FROM model_binaries WHERE model_id = {model_id} ORDER BY version DESC LIMIT 1;"
+    cur = db.cursor()
+    app.logger.info(f"Executing query: {query}")
+    cur.execute(query)
+    binary_data = cur.fetchone()
+    cur.close()
+
+    if binary_data:
+        return Response(binary_data[0], mimetype="application/octet-stream")
+    else:
+        return Response("Binary not found", status=404)
+
+
 @app.route("/clients", methods=["GET"])
 @cross_origin()
 def get_clients():
