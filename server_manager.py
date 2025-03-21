@@ -137,9 +137,9 @@ def main():
                     case "a":
                         attach_to_server()
                     case "st":
-                        print("Start Server")  # TODO
+                        start_server()
                     case "sp":
-                        print("Stop Server")  # TODO
+                        stop_server()
                     case "b":
                         set_curr_menu(menu_states.MAIN)
             else:
@@ -412,7 +412,6 @@ def uninstall_civic_server(quiet=False):
         print("Stopping and removing containers...")
     for container in client.containers.list(all=True):
         if container.name in [
-            "civic-server",
             "civic-middleware",
             "civic-db",
             "civic-adminer",
@@ -440,11 +439,41 @@ def uninstall_civic_server(quiet=False):
             "civic-middleware:latest",
             "civic-db:latest",
             "civic-internal-server:latest",
+            # Don't delete adminer, pain to redownload
         ]:
             client.images.remove(image.id)
 
     if not quiet:
         print(Fore.RED + "CIVIC Server uninstalled.\n" + Style.RESET_ALL)
+
+
+def start_server():
+    global client
+    print("Starting the CIVIC server...")
+    for container in client.containers.list(all=True):
+        if container.name in [
+            "civic-middleware",
+            "civic-db",
+            "civic-adminer",
+            "civic-internal-server",
+        ]:
+            if container.status != "running":
+                container.start()
+    print("CIVIC server started.\n")
+
+
+def stop_server():
+    global client
+    print("Stopping the CIVIC server...")
+    for container in client.containers.list(all=True):
+        if container.name in [
+            "civic-middleware",
+            "civic-db",
+            "civic-adminer",
+            "civic-internal-server",
+        ]:
+            container.stop()
+    print("CIVIC server stopped.\n")
 
 
 def list_models():
