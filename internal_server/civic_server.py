@@ -11,10 +11,6 @@ import prettytable
 
 middleware_url = "http://civic-middleware:5000"
 
-os.environ["LANG"] = "C.UTF-8"
-os.environ["LC_ALL"] = "C.UTF-8"
-os.environ["TERM"] = "xterm-256color"
-
 
 class CursesLoggerHandler(logging.Handler):
     def __init__(self, stdscr):
@@ -153,6 +149,14 @@ class CIVICServer:
                 range_start = int(cmd_args[1])
                 range_end = int(cmd_args[2])
                 self.distribute_binary(model_id, range_start, range_end)
+        elif cmd == "execute":
+            if len(cmd_args) < 3:
+                logging.info("Usage: execute <model_id> <range_start> <range_end>")
+            else:
+                model_id = cmd_args[0]
+                range_start = int(cmd_args[1])
+                range_end = int(cmd_args[2])
+                self.execute_binary(model_id, range_start, range_end)
         elif cmd == "shutdown":
             os.kill(os.getpid(), signal.SIGINT)
         else:
@@ -419,6 +423,30 @@ class CIVICServer:
 
         except requests.RequestException as e:
             logging.error(f"Failed to distribute model {model_id}: {e}")
+
+    def execute_binary(self, model_id, range_start, range_end):
+        if self.clients:
+            # Validate range
+            if range_start < 0 or range_end >= len(self.clients):
+                logging.warning(
+                    "Invalid range. Please provide a valid range of clients."
+                )
+                return
+
+            # Get the list of clients within the specified range
+            client_list = list(self.clients.items())[range_start : range_end + 1]
+
+            # Execute the model binary on the selected clients
+            for client_uuid, client_socket in client_list:
+                try:
+                    client_socket.sendall(f"EXECUTE {model_id}".encode("utf-8"))
+                    logging.info(
+                        f"Model {model_id} execution requested for client {client_uuid}"
+                    )
+                except Exception as e:
+                    logging.error(
+                        f"Failed to execute model {model_id} on client {client_uuid}: {e}"
+                    )
 
 
 def main(stdscr):

@@ -85,6 +85,8 @@ def listen_for_messages():
                         uuid_file.write(client_uuid)
                 if decoded_response.startswith("MODEL_BIN"):
                     download_binary(decoded_response)
+                if decoded_response.startswith("EXECUTE"):
+                    execute_binary(decoded_response)
                 if decoded_response == "Server is shutting down":
                     safe_exit()
 
@@ -124,6 +126,19 @@ def download_binary(decoded_response):
     logging.info(
         f"Model {model_id} binary received from the server and saved to {file_path}"
     )
+
+
+def execute_binary(decoded_response):
+    global s
+
+    logging.info("Executing model binary...")
+    model_id = decoded_response.split(" ")[1]
+    file_path = os.path.join("download", f"model_{model_id}.bin")
+
+    # Execute the model binary
+    os.system(f"./{file_path}")
+
+    logging.info(f"Model {model_id} binary executed.")
 
 
 def safe_exit(*args):
