@@ -11,13 +11,17 @@ import prettytable
 
 middleware_url = "http://civic-middleware:5000"
 
+os.environ["LANG"] = "C.UTF-8"
+os.environ["LC_ALL"] = "C.UTF-8"
+os.environ["TERM"] = "xterm-256color"
+
 
 class CursesLoggerHandler(logging.Handler):
     def __init__(self, stdscr):
         super().__init__()
         self.stdscr = stdscr
         self.log_pad = curses.newpad(
-            1000, curses.COLS
+            1000, self.stdscr.getmaxyx()[1]
         )  # Create a pad with a large height
         self.log_pad_pos = 0  # Track the current scroll position
 
@@ -70,29 +74,41 @@ class CIVICServer:
         self.server_socket.listen(5)
         logging.info(f"Server started on {self.host}:{self.port}")
 
-    # TODO: curses stdscr REALLY doesn't work well with Docker. It's a pain to get it to work.
-    # The problem is that the terminal size is detected for the container, but when attaching
-    # to the container, the terminal size is different. This causes the curses pad to be the wrong size.
-    # I've tried a few different solutions, but none have worked well. I'm going to leave this as is for now.
     def handle_server_commands(self):
         try:
             curses.curs_set(1)
             max_y, max_x = self.stdscr.getmaxyx()
             input_win = curses.newwin(1, max_x, max_y - 1, 0)
-            input_win.timeout(100)  # Set a timeout of 100ms for non-blocking input
         except curses.error as e:
             logging.error(f"Curses initialization error: {e}")
             return
 
         command_buffer = ""
         while self.server_running:
-            input_win.erase()
+            input_win.clear()
             input_win.addstr(0, 0, f"$ {command_buffer}")
             input_win.refresh()
             try:
                 key = input_win.getch()
                 if key == -1:  # No input
                     continue
+                elif key == curses.KEY_RESIZE:
+                    # logging.info("Terminal resized")
+                    max_y, max_x = self.stdscr.getmaxyx()
+                    input_win.mvwin(max_y - 1, 0)
+                    input_win.resize(1, max_x)
+                    # Refresh the pad to adjust to the new terminal size
+                    self.logger_handler.log_pad.resize(
+                        max(1000, self.logger_handler.log_pad_pos + 1), max_x
+                    )
+                    self.logger_handler.log_pad.refresh(
+                        max(0, self.logger_handler.log_pad_pos - max_y + 1),
+                        0,
+                        0,
+                        0,
+                        max_y - 1,
+                        max_x - 1,
+                    )
                 elif key in (curses.KEY_BACKSPACE, 127):  # Handle backspace
                     command_buffer = command_buffer[:-1]
                 elif key in (10, 13):  # Handle Enter key
@@ -100,49 +116,47 @@ class CIVICServer:
                     command_buffer = ""
                     if not command:
                         continue
-
-                    args = command.split()
-                    cmd = args[0].lower()
-                    cmd_args = args[1:]
-
-                    if cmd in ["help", "h"]:
-                        logging.info("Available commands:")
-                        logging.info("  clients - List all connected clients.")
-                        logging.info("  models - List all available models.")
-                        logging.info(
-                            "  download <model_id> - Download a model's binary by its ID."
-                        )
-                        logging.info("  shutdown - Shut down the server.")
-                    elif cmd in ["exit", "quit", "q"]:
-                        logging.info("To detach from the server console, use Ctrl+D.")
-                    elif cmd in ["clients", "citizens", "lc"]:
-                        self.list_clients()
-                    elif cmd in ["models", "lm"]:
-                        self.list_models()
-                    elif cmd == "download":
-                        if not cmd_args:
-                            logging.info("Usage: download <model_id>")
-                            continue
-                        model_id = cmd_args[0]
-                        self.download_binary(model_id)
-                    elif cmd == "distribute":
-                        if len(cmd_args) < 3:
-                            logging.info(
-                                "Usage: distribute <model_id> <range_start> <range_end>"
-                            )
-                            continue
-                        model_id = cmd_args[0]
-                        range_start = int(cmd_args[1])
-                        range_end = int(cmd_args[2])
-                        self.distribute_binary(model_id, range_start, range_end)
-                    elif cmd == "shutdown":
-                        os.kill(os.getpid(), signal.SIGINT)
-                    else:
-                        logging.info(f"Command not recognized: {command}")
+                    self.parse_server_command(command)
                 else:
                     command_buffer += chr(key)
             except Exception as e:
                 logging.error(f"Error handling input: {e}")
+
+    def parse_server_command(self, command):
+        args = command.split()
+        cmd = args[0].lower()
+        cmd_args = args[1:]
+
+        if cmd in ["help", "h"]:
+            logging.info("Available commands:")
+            logging.info("  clients - List all connected clients.")
+            logging.info("  models - List all available models.")
+            logging.info("  download <model_id> - Download a model's binary by its ID.")
+            logging.info("  shutdown - Shut down the server.")
+        elif cmd in ["exit", "quit", "q"]:
+            logging.info("To detach from the server console, use Ctrl+D.")
+        elif cmd in ["clients", "citizens", "lc"]:
+            self.list_clients()
+        elif cmd in ["models", "lm"]:
+            self.list_models()
+        elif cmd == "download":
+            if not cmd_args:
+                logging.info("Usage: download <model_id>")
+            else:
+                model_id = cmd_args[0]
+                self.download_binary(model_id)
+        elif cmd == "distribute":
+            if len(cmd_args) < 3:
+                logging.info("Usage: distribute <model_id> <range_start> <range_end>")
+            else:
+                model_id = cmd_args[0]
+                range_start = int(cmd_args[1])
+                range_end = int(cmd_args[2])
+                self.distribute_binary(model_id, range_start, range_end)
+        elif cmd == "shutdown":
+            os.kill(os.getpid(), signal.SIGINT)
+        else:
+            logging.info(f"Command not recognized: {command}")
 
     def handle_client(self, client_socket, address):
         # Handle a new client connection

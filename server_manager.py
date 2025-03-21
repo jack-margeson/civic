@@ -254,8 +254,13 @@ def print_table(data):
 
 
 def update_menu_state():
+    global client
+
+    # Check if the middleware container is present
+    # If so, the server is installed
     if any(
-        container.name == "civic-middleware" for container in client.containers.list()
+        container.name == "civic-middleware"
+        for container in client.containers.list(all=True)
     ):
         # Disable "Install CIVIC Server" option
         menu_options[1][0]["status"] = 0
@@ -485,8 +490,9 @@ def list_models():
 
 def attach_to_server():
     try:
-        print("Attaching to the server. Press Ctrl+D to detach.")
+        # print("Attaching to the server. Press Ctrl+D to detach.")
         os.system('docker attach civic-internal-server --detach-keys="ctrl-d"')
+        update_menu_state()  # Server may have been stopped
         print_menu(
             curr_menu,
             header=True,
