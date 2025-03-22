@@ -3,11 +3,9 @@
 // and creates an output file with the next letter of the alphabet. (a->b).
 // The program will also burn CPU cycles to simulate a real program, between 1 and 5 seconds.
 
-
-// If the input file is not a letter of the alphabet, the output file will be empty.
+// INPUT: [{"letter":"a"}]
 // If the input file is 'z', the output file will be 'a'.
 // If the input file is empty, the output file will be empty.
-// If the input file is not a single character, the output file will be empty.
 // If the input file is a letter of the alphabet, but not lowercase, the output file will be empty.
 
 
@@ -44,16 +42,51 @@ void process_file(const char *input_file, const char *output_file) {
         return;
     }
 
-    int ch = fgetc(in);
-    if (ch == EOF || !islower(ch) || fgetc(in) != EOF) {
-        // Input file is empty, not a single lowercase letter, or has more than one character
+    char ch;
+    char buffer[256];
+
+    // Read the input file as JSON
+    if (fgets(buffer, sizeof(buffer), in) == NULL) {
+        // If the input file is empty or invalid, leave the output file empty
+        fprintf(stderr, "Error: Input file is empty or invalid.\n");
+        fclose(in);
+        fclose(out);
+        return;
+    }
+
+    // Parse the JSON to extract the "letter" field
+    char *start = strstr(buffer, "\"letter\":");
+    if (!start) {
+        // If the "letter" field is not found, leave the output file empty
+        fprintf(stderr, "Error: \"letter\" field not found in input file.\n");
+        fclose(in);
+        fclose(out);
+        return;
+    }
+
+    start += strlen("\"letter\":");
+    while (*start && (*start == ' ' || *start == '\"')) start++;
+
+    ch = *start;
+    if (*start == '\0' || *(start + 1) != '\"') {
+        fprintf(stderr, "Error: Invalid JSON format for \"letter\" field.\n");
+        fclose(in);
+        fclose(out);
+        return;
+    }
+
+    // Check if the character is a lowercase letter
+    if (!islower(ch)) {
+        fprintf(stderr, "Error: Character is not a lowercase letter.\n");
         fclose(in);
         fclose(out);
         return;
     }
 
     char next_char = (ch == 'z') ? 'a' : ch + 1;
-    fprintf(out, " %c->%c ", ch, next_char);
+    
+    // Write the next character to the output file in JSON format
+    fprintf(out, "[{\"letter\": \"%c\"}]\n", next_char);
 
     fclose(in);
     fclose(out);
