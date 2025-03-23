@@ -17,6 +17,7 @@ import psycopg2
 # from psycopg2 import sql
 import signal
 import sys
+import random
 
 app = Flask(__name__)
 CORS(app)
@@ -85,6 +86,64 @@ def download_binary(model_id):
         return Response(binary_data[0], mimetype="application/octet-stream")
     else:
         return Response("Binary not found", status=404)
+
+
+@app.route("/dataset/<int:model_id>", methods=["GET"])
+@cross_origin()
+def get_dataset(model_id):
+    query = f"SELECT * FROM model_{model_id}_data;"
+    return db_query(query)
+
+
+@app.route("/create_dataset/<int:model_id>", methods=["POST"])
+@cross_origin()
+def create_dataset(model_id):
+    try:
+        # Parse the request data
+        dataset_type = request.json.get("type")
+        data = request.json.get("data")
+        split = int(request.json.get("split", 5))
+        replication = request.json.get("replication", False)
+        replication_percentage = int(request.json.get("replication_percentage", 10))
+        shuffle = request.json.get("shuffle", False)
+
+        if not dataset_type or not data:
+            return Response("Invalid dataset payload", status=400)
+
+        # Shuffle the dataset if required
+        if shuffle:
+            random.shuffle(data)
+
+        # Split the dataset
+        splits = [data[i : i + split] for i in range(0, len(data), split)]
+
+        # Handle replication if enabled
+        if replication:
+            replication_count = max(1, (len(splits) * replication_percentage) // 100)
+            replicated_splits = random.sample(splits, replication_count)
+            splits.extend(replicated_splits)
+
+        # Define the table name
+        table_name = f"model_{model_id}_data"
+        # Create a cursor
+        cur = db.cursor()
+        # Check if the table has existing data and delete it (user chose to overwrite)
+        cur.execute(f"DELETE FROM {table_name};")
+
+        # Insert the dataset into the table
+        for split_index, split_data in enumerate(splits):
+            cur.execute(
+                f"INSERT INTO {table_name} (model_id, split_id, data) VALUES (%s, %s, %s);",
+                (model_id, split_index, json.dumps(split_data)),
+            )
+
+        db.commit()
+        cur.close()
+
+        return Response("Dataset created successfully", status=201)
+    except Exception as e:
+        app.logger.error(f"Error creating dataset: {e}")
+        return Response(f"Error creating dataset: {e}", status=500)
 
 
 @app.route("/clients", methods=["GET"])

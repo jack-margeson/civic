@@ -12,6 +12,7 @@ from colorama import Fore, Style, init
 from enum import Enum
 import signal
 import prettytable
+import csv
 
 VERSION = "v0.1.0"
 
@@ -29,6 +30,7 @@ menu_options = [
         {"key": "u", "command": "Uninstall CIVIC Server", "status": 1},
         {"key": "ms", "command": "Manage CIVIC Server", "status": 1},
         {"key": "mm", "command": "Manage Models", "status": 1},
+        {"key": "md", "command": "Manage Datasets", "status": 1},
     ],
     [  # Manage server (2)
         {"key": "a", "command": "Attach to Server Console", "status": 1},
@@ -43,15 +45,23 @@ menu_options = [
         {"key": "d", "command": "Delete Model", "status": 1},
         {"key": "b", "command": "Back", "status": 1},
     ],
+    [  # Manage datasets (4)
+        {"key": "c", "command": "Create Dataset", "status": 1},
+        {"key": "d", "command": "Delete Dataset", "status": 1},
+        {"key": "b", "command": "Back", "status": 1},
+    ],
 ]
 menu_states = Enum(
-    "Menu", ["GLOBAL", "MAIN", "MANAGE_SERVER", "MANAGE_MODELS"], start=0
+    "Menu",
+    ["GLOBAL", "MAIN", "MANAGE_SERVER", "MANAGE_MODELS", "MANAGE_DATASETS"],
+    start=0,
 )
 menu_state_titles = [
     "Global Commands",
     "Main Menu",
     "Manage CIVIC Server",
     "Manage Models",
+    "Manage Datasets",
 ]
 curr_menu = menu_states.MAIN
 
@@ -118,6 +128,8 @@ def main():
                         set_curr_menu(menu_states.MANAGE_SERVER)
                     case "mm":
                         set_curr_menu(menu_states.MANAGE_MODELS)
+                    case "md":
+                        set_curr_menu(menu_states.MANAGE_DATASETS)
             else:
                 if any(
                     choice == item["key"]
@@ -176,6 +188,29 @@ def main():
                     print_error("Command currently disabled. Please try again.")
                 else:
                     print_error("Command not recognized. Please try again.")
+
+            ### Manage Datasets (4)
+        elif curr_menu == menu_states.MANAGE_DATASETS:
+            if any(
+                choice == item["key"] and item["status"]
+                for item in menu_options[menu_states.MANAGE_DATASETS.value]
+            ):
+                match choice:
+                    case "c":
+                        create_dataset()
+                    case "d":
+                        print("Delete Dataset")  # TODO
+                    case "b":
+                        set_curr_menu(menu_states.MAIN)
+            else:
+                if any(
+                    choice == item["key"]
+                    for item in menu_options[menu_states.MANAGE_DATASETS.value]
+                ):
+                    print_error("Command currently disabled. Please try again.")
+                else:
+                    print_error("Command not recognized. Please try again.")
+
         update_menu_state()
 
 
@@ -242,6 +277,10 @@ def print_menu(menu_index=menu_states.MAIN, header=False, clear=False):
     print(Style.RESET_ALL)
 
 
+def print_success(message):
+    print(Fore.GREEN + message + Style.RESET_ALL + "\n")
+
+
 def print_error(message):
     print(Fore.RED + message + Style.RESET_ALL + "\n")
 
@@ -270,6 +309,8 @@ def update_menu_state():
         menu_options[1][2]["status"] = 1
         # Enable "Manage Models" option
         menu_options[1][3]["status"] = 1
+        # Enable "Manage Datasets" option
+        menu_options[1][4]["status"] = 1
     else:
         # Enable "Install CIVIC Server" option
         menu_options[1][0]["status"] = 1
@@ -279,6 +320,8 @@ def update_menu_state():
         menu_options[1][2]["status"] = 0
         # Disable "Manage Models" option
         menu_options[1][3]["status"] = 0
+        # Disable "Manage Datasets" option
+        menu_options[1][4]["status"] = 0
 
     # Check if the internal server is running
     if any(
@@ -404,7 +447,7 @@ def install_civic_server():
         detach=True,
     )
 
-    print(Fore.GREEN + "CIVIC Server installed!\n" + Style.RESET_ALL)
+    print_success("CIVIC Server installed!")
 
 
 def uninstall_civic_server(quiet=False):
@@ -464,7 +507,7 @@ def start_server():
         ]:
             if container.status != "running":
                 container.start()
-    print("CIVIC server started.\n")
+    print_success("CIVIC server started")
 
 
 def stop_server():
@@ -501,8 +544,121 @@ def attach_to_server():
         print_error(f"Failed to attach to the server: {e}")
 
 
-def manage_models():
-    print("Managing models...")  # TODO
+def create_dataset():
+    list_models()
+    model_id = input(
+        "Enter the ID of the model you want to create the dataset for: "
+    ).strip()
+
+    # Check if there is a dataset for the model
+    response = requests.get(f"{middleware_url}/dataset/{model_id}")
+    if response.status_code == 200:
+        if len(response.json()) > 0:
+            print_error("Dataset already exists for this model.")
+            override = (
+                input("Do you want to override the existing dataset? [y/N]: ")
+                .strip()
+                .lower()
+            )
+            if override != "y":
+                return
+
+        # Ask for the type of dataset
+        dataset_type = input("Enter the type of dataset [csv, json, txt]: ").strip()
+        if dataset_type not in ["csv", "json", "txt"]:
+            print_error("Invalid dataset type.")
+            return
+
+        # Ask for the dataset path
+        dataset_path = input("Enter the path to the dataset: ").strip()
+        if not os.path.exists(dataset_path):
+            print_error("Dataset not found.")
+            return
+
+        # Open the dataset file
+        try:
+            with open(dataset_path, "r") as f:
+                dataset = f.read()
+                match dataset_type:
+                    case "csv":
+                        dataset = list(csv.DictReader(dataset.splitlines()))
+                    case "json":
+                        pass  # TODO
+                    case "txt":
+                        pass  # TODO
+        except Exception as e:
+            print_error(f"Failed to read the dataset: {e}")
+            return
+
+        # print(dataset)
+
+        # Ask for how the dataset should be split
+        print(
+            "\nEach citizen will receive a split of the dataset when duties are assigned."
+        )
+        print(
+            "The dataset will be split into equal parts, with the last split containing the remainder."
+        )
+        print(
+            "For example, if there are 100 entries and 3 splits, each split will contain 33, 33, and 34 data entries."
+        )
+        print(
+            "It is suggested to keep splits small to prevent overloading the clients, and for a better distribution of work.\n"
+        )
+        split = int(
+            input(
+                f"The imported dataset has a total of {len(dataset)} entries. Enter the number of splits (default 5/{len(dataset)}): "
+            ).strip()
+        )
+
+        # Ask if the dataset should include replication
+        print("\nOptionally, replication can be enabled for the dataset.")
+        print("If enabled, the percentage of replication can be specified.")
+        print(
+            "For example, if 10% replication is specified, 10% of the dataset splits will be duplicated at random."
+        )
+        print("This can be useful for validating the results of the citizens.\n")
+        replication = input(f"Enable replication? [y/N]: ").strip().lower()
+        replication = replication == "y"
+        replication_percentage = 0
+        if replication:
+            replication_percentage = input(
+                "Enter the percentage of replication (default: 10%): "
+            ).strip()
+            replication_percentage = (
+                int(replication_percentage) if replication_percentage else 10
+            )
+
+        # Ask if the dataset should be shuffled
+        print("\n")
+        shuffle = input("Should the dataset be shuffled? [y/N]: ").strip().lower()
+        shuffle = shuffle == "y"
+
+        # Create dataset payload
+        dataset_payload = {
+            "type": dataset_type,
+            "data": dataset,
+            "split": split,
+            "replication": replication,
+            "replication_percentage": replication_percentage,
+            "shuffle": shuffle,
+        }
+
+        # Send the dataset payload to the server
+        print("Creating dataset...")
+        response = requests.post(
+            f"{middleware_url}/create_dataset/{model_id}", json=dataset_payload
+        )
+        response.raise_for_status()
+        if response.status_code == 201:
+            print_success("Dataset created successfully.")
+        else:
+            print_error("Failed to create dataset.")
+
+        return
+    elif response.status_code != 404:
+        print_error("Failed to check if dataset exists.")
+        return
 
 
 def safe_exit():
