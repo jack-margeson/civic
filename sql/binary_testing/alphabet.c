@@ -24,6 +24,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    srand(time(NULL));
     process_file(argv[1], argv[2]);
     return 0;
 }
@@ -86,7 +87,7 @@ void process_file(const char *input_file, const char *output_file) {
     char next_char = (ch == 'z') ? 'a' : ch + 1;
     
     // Write the next character to the output file in JSON format
-    fprintf(out, "[{\"letter\": \"%c\"}]\n", next_char);
+    fprintf(out, "[{\"original_letter\": \"%c\", \"letter\": \"%c\"}]\n", ch, next_char);
 
     fclose(in);
     fclose(out);
