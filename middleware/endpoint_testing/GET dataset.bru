@@ -1,0 +1,15 @@
+meta {
+  name: GET dataset
+  type: http
+  seq: 1
+}
+
+get {
+  url: http://localhost:5000/dataset/:model_id
+  body: none
+  auth: none
+}
+
+params:path {
+  model_id: 2
+}

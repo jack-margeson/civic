@@ -1,0 +1,18 @@
+meta {
+  name: POST clients
+  type: http
+  seq: 2
+}
+
+get {
+  url: http://localhost:5000/clients
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "ip": "0.0.0.0",
+    "port": "20"
+  }
+}
