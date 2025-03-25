@@ -507,7 +507,7 @@ def start_server():
         ]:
             if container.status != "running":
                 container.start()
-    print_success("CIVIC server started")
+    print_success("CIVIC Server started.")
 
 
 def stop_server():
@@ -521,7 +521,7 @@ def stop_server():
             "civic-internal-server",
         ]:
             container.stop()
-    print("CIVIC server stopped.\n")
+    print_error("CIVIC Server stopped.")
 
 
 def list_models():
@@ -605,11 +605,10 @@ def create_dataset():
         print(
             "It is suggested to keep splits small to prevent overloading the clients, and for a better distribution of work.\n"
         )
-        split = int(
-            input(
-                f"The imported dataset has a total of {len(dataset)} entries. Enter the number of splits (default 5/{len(dataset)}): "
-            ).strip()
-        )
+        split = input(
+            f"The imported dataset has a total of {len(dataset)} entries. Enter the number of splits (default 5/{len(dataset)}): "
+        ).strip()
+        split = int(split) if split else 5
 
         # Ask if the dataset should include replication
         print("\nOptionally, replication can be enabled for the dataset.")
@@ -630,7 +629,7 @@ def create_dataset():
             )
 
         # Ask if the dataset should be shuffled
-        print("\n")
+        print("")
         shuffle = input("Should the dataset be shuffled? [y/N]: ").strip().lower()
         shuffle = shuffle == "y"
 
