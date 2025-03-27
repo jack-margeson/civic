@@ -8,6 +8,7 @@ import time
 import os
 import json
 import prettytable
+import queue
 
 middleware_url = "http://civic-middleware:5000"
 
@@ -48,6 +49,7 @@ class CIVICServer:
         self.logger_handler = None
         self.server_socket = None
         self.server_command_thread = None
+        self.duties = queue.Queue()
 
         # Init. the server
         self.init_server()
@@ -157,6 +159,17 @@ class CIVICServer:
                 range_start = int(cmd_args[1])
                 range_end = int(cmd_args[2])
                 self.execute_binary(model_id, range_start, range_end)
+        elif cmd == "generate_duties":
+            if len(cmd_args) < 2:
+                logging.info(
+                    "Usage: generate_duties <model_id> <range_start> <range_end>"
+                )
+            else:
+                model_id = cmd_args[0]
+                range_start = int(cmd_args[1])
+                range_end = int(cmd_args[2])
+                self.generate_duties(model_id, range_start, range_end)
+
         elif cmd == "shutdown":
             os.kill(os.getpid(), signal.SIGINT)
         else:
@@ -203,13 +216,14 @@ class CIVICServer:
                 client_socket.close()
                 return
 
+        # Handle all other messages from the client
         while True:
             try:
                 message = client_socket.recv(1024).decode("utf-8")
                 if message:
-                    logging.info(f"Received message from {address}: {message}")
-                    # Handle commands from the client here
-                    if message.lower() == "exit":
+                    logging.debug(f"Received message from {address}: {message}")
+                    # Handle client responses here
+                    if message == "EXIT":
                         logging.info(f"Connection from {address} closed")
                         self.db_update_client_connection(
                             address[0], address[1], 0, client_uuid=client_uuid
@@ -218,21 +232,29 @@ class CIVICServer:
                             del self.clients[client_uuid]
                         client_socket.close()
                         break
-                    elif message.lower() == "ping":
-                        client_socket.send("pong".encode("utf-8"))
-                    else:
-                        client_socket.send("Message not recognized".encode("utf-8"))
+                    if message.startswith("RESULTS"):
+                        # Handle results from the client
+                        self.handle_results(client_uuid, message)
+                    if message == ("READY"):
+                        # Send the next duty to the client
+                        self.send_duty(client_socket)
                 else:
                     break
             except ConnectionResetError:
                 logging.info(f"Connection from {address} lost")
                 if client_socket in self.clients:
                     self.clients.remove(client_socket)
+                self.db_update_client_connection(
+                    address[0], address[1], 0, client_uuid=client_uuid
+                )
                 break
             except Exception as e:
                 logging.error(f"An error occurred with connection from {address}: {e}")
                 if client_socket in self.clients:
                     self.clients.remove(client_socket)
+                self.db_update_client_connection(
+                    address[0], address[1], 0, client_uuid=client_uuid
+                )
                 break
 
     def db_update_client_connection(
@@ -447,6 +469,74 @@ class CIVICServer:
                     logging.error(
                         f"Failed to execute model {model_id} on client {client_uuid}: {e}"
                     )
+
+    def generate_duties(self, model_id, range_start, range_end):
+        if self.clients:
+            # Validate range
+            if range_start < 0 or range_end >= len(self.clients):
+                logging.warning(
+                    "Invalid range. Please provide a valid range of clients."
+                )
+                return
+
+            # Get the list of clients within the specified range
+            client_list = list(self.clients.items())[range_start : range_end + 1]
+
+            try:
+                # Get the dataset for the model specified
+                response = requests.get(f"{middleware_url}/dataset/{model_id}")
+                response.raise_for_status()
+                dataset = response.json()
+            except requests.RequestException as e:
+                logging.error(f"Failed to get dataset for model {model_id}: {e}")
+                return
+
+            if dataset is None or []:
+                logging.error(
+                    f"No dataset found for model {model_id}. No duties were created."
+                )
+                return
+
+            # Populate queue with dataset splits
+            for dataset_split in dataset:
+                self.duties.put(dataset_split)
+
+            # Send the first duty to each client
+            for client_uuid, client_socket in client_list:
+                self.send_duty(client_socket)
+
+    def send_duty(self, client_socket):
+        if not self.duties.empty():
+            logging.debug("Remaining duties: %d", self.duties.qsize())
+            duty = self.duties.get()
+            duty_payload = json.dumps(duty)
+            client_socket.sendall(f"DUTY {duty_payload}".encode("utf-8"))
+        else:
+            client_socket.sendall(f"NONE".encode("utf-8"))
+            logging.info(
+                f"Tried to send a duty to a client, but no duties are available."
+            )
+
+    def handle_results(self, client_uuid, message):
+        # Handle results from the client
+        results_raw = message.split(" ")[1:]
+        results = {
+            "client_uuid": client_uuid,
+            "id": results_raw[0],
+            "model_id": results_raw[1],
+            "data": json.loads(" ".join(results_raw[2:])),
+        }
+
+        logging.info(f"Results received from client: {results}")
+
+        # Send the results to the middleware
+        try:
+            response = requests.post(
+                f"{middleware_url}/upload_result/{results['model_id']}", json=results
+            )
+            response.raise_for_status()
+        except requests.RequestException as e:
+            logging.error(f"Failed to upload results for client {client_uuid}: {e}")
 
 
 def main(stdscr):

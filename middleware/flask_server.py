@@ -44,11 +44,8 @@ def get_models():
 @cross_origin()
 def add_client():
     return db_query(
-        "WITH ins AS (INSERT INTO clients (ip, port, status) VALUES ('"
-        + request.json["ip"]
-        + "', "
-        + str(request.json["port"])
-        + ", 1) RETURNING *) SELECT * FROM ins;"
+        "INSERT INTO clients (ip, port, status) VALUES ('%s', '%s', 1) RETURNING *;"
+        % (request.json.get("ip"), request.json.get("port"))
     )
 
 
@@ -56,9 +53,8 @@ def add_client():
 @cross_origin()
 def deactivate_client(client_uuid):
     return db_query(
-        "WITH upd AS (UPDATE clients SET status = 0 WHERE client_uuid = '"
-        + client_uuid
-        + "' RETURNING *) SELECT * FROM upd;"
+        "UPDATE clients SET status = 0 WHERE client_uuid = '%s' RETURNING *;"
+        % client_uuid
     )
 
 
@@ -66,9 +62,8 @@ def deactivate_client(client_uuid):
 @cross_origin()
 def activate_client(client_uuid):
     return db_query(
-        "WITH upd AS (UPDATE clients SET status = 1 WHERE client_uuid = '"
-        + client_uuid
-        + "' RETURNING *) SELECT * FROM upd;"
+        "UPDATE clients SET status = 1 WHERE client_uuid = '%s' RETURNING *;"
+        % client_uuid
     )
 
 
@@ -133,8 +128,8 @@ def create_dataset(model_id):
         # Insert the dataset into the table
         for split_index, split_data in enumerate(splits):
             cur.execute(
-                f"INSERT INTO {table_name} (model_id, split_id, data) VALUES (%s, %s, %s);",
-                (model_id, split_index, json.dumps(split_data)),
+                f"INSERT INTO {table_name} (model_id, data) VALUES (%s, %s);",
+                (model_id, json.dumps(split_data)),
             )
 
         db.commit()
@@ -152,6 +147,43 @@ def get_clients():
     return db_query("SELECT * FROM clients")
 
 
+@app.route("/results/<int:model_id>", methods=["GET"])
+@cross_origin()
+def get_results(model_id):
+    query = f"SELECT * FROM model_{model_id}_results;"
+    return db_query(query)
+
+
+@app.route("/upload_result/<int:model_id>", methods=["POST"])
+@cross_origin()
+def upload_result(model_id):
+    # Parse the request data
+    try:
+        client_uuid = request.json.get("client_uuid")
+        data_split_id = request.json.get("id")
+        result_data = request.json.get("data")
+
+        if not result_data or not client_uuid:
+            return Response("Invalid result payload", status=400)
+
+        # Define the table name
+        table_name = f"model_{model_id}_results"
+
+        # Insert the result into the table
+        cur = db.cursor()
+        cur.execute(
+            f"INSERT INTO {table_name} (data_split_id, model_id, client_uuid, result) VALUES (%s, %s, %s, %s);",
+            (data_split_id, model_id, client_uuid, json.dumps(result_data)),
+        )
+        db.commit()
+        cur.close()
+
+        return Response("Result uploaded successfully", status=201)
+    except Exception as e:
+        app.logger.error(f"Error uploading result: {e}")
+        return Response(f"Error uploading result: {e}", status=500)
+
+
 def conn_db():
     global db
     db = psycopg2.connect(
@@ -164,6 +196,8 @@ def conn_db():
 
 
 def db_query(query):
+    global db
+
     # Create db cursor
     cur = db.cursor()
 
@@ -175,6 +209,9 @@ def db_query(query):
 
     # Close cursor
     cur.close()
+
+    # Commit the transaction
+    db.commit()
 
     # Combine column names and rows into a list of dicts
     result = []

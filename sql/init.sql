@@ -56,7 +56,6 @@ BEGIN
         CREATE TABLE model_%s_data (
             id SERIAL PRIMARY KEY,
             model_id INTEGER NOT NULL REFERENCES models(model_id),
-            split_id INTEGER NOT NULL,
             data JSONB NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )', NEW.model_id);
@@ -64,7 +63,9 @@ BEGIN
     EXECUTE format('
         CREATE TABLE model_%s_results (
             id SERIAL PRIMARY KEY,
+            data_split_id INTEGER NOT NULL REFERENCES model_%1$s_data(id),
             model_id INTEGER NOT NULL REFERENCES models(model_id),
+            client_uuid UUID NOT NULL REFERENCES clients(client_uuid),
             result JSONB NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )', NEW.model_id);

@@ -4,6 +4,8 @@ import logging
 import threading
 import os
 import signal
+import json
+import subprocess
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -38,8 +40,9 @@ def configure():
             CLIENT_UUID = uuid_file.read().strip()
             logging.info(f"Loaded client UUID: {CLIENT_UUID}")
 
-    # Create a download directory if it doesn't exist
+    # Create a download and temp directory if it doesn't exist
     os.makedirs("download", exist_ok=True)
+    os.makedirs("temp", exist_ok=True)
 
 
 def connect_to_server():
@@ -76,18 +79,20 @@ def listen_for_messages():
             response = s.recv(1024)
 
             if response:
-                decoded_response = response.decode()
-                logging.info(f"Received response from server: {decoded_response}")
-                if decoded_response.startswith("UUID "):
-                    client_uuid = decoded_response.split(" ")[1]
+                message = response.decode()
+                logging.info(f"Received response from server: {message}")
+                if message.startswith("UUID "):
+                    client_uuid = message.split(" ")[1]
                     logging.info(f"Client UUID: {client_uuid}")
                     with open("citizen_uuid", "w") as uuid_file:
                         uuid_file.write(client_uuid)
-                if decoded_response.startswith("MODEL_BIN"):
-                    download_binary(decoded_response)
-                if decoded_response.startswith("EXECUTE"):
-                    execute_binary(decoded_response)
-                if decoded_response == "Server is shutting down":
+                if message.startswith("MODEL_BIN"):
+                    download_binary(message)
+                if message.startswith("EXECUTE"):
+                    execute_binary(message)
+                if message.startswith("DUTY"):
+                    execute_duty(message)
+                if message == "Server is shutting down":
                     safe_exit()
 
             else:
@@ -97,11 +102,11 @@ def listen_for_messages():
             break
 
 
-def download_binary(decoded_response):
+def download_binary(message):
     global s
 
     logging.info("Downloading model binary from the server...")
-    model_id, binary_size = decoded_response.split(" ")[1:3]
+    model_id, binary_size = message.split(" ")[1:3]
     binary_size = int(binary_size)
     model_data = b""
 
@@ -128,17 +133,72 @@ def download_binary(decoded_response):
     )
 
 
-def execute_binary(decoded_response):
+def execute_binary(message):
     global s
 
     logging.info("Executing model binary...")
-    model_id = decoded_response.split(" ")[1]
+    model_id = message.split(" ")[1]
     file_path = os.path.join("download", f"model_{model_id}.bin")
 
     # Execute the model binary
-    os.system(f"./{file_path}")
+    try:
+        subprocess.run([file_path], check=True)
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error executing model binary: {e}")
+        return
 
     logging.info(f"Model {model_id} binary executed.")
+
+
+def execute_duty(message):
+    global s
+
+    logging.info("Executing duty...")
+    duty_raw = message.split(" ", 1)[1]
+    duty = json.loads(duty_raw)
+
+    #   Example duty
+    #   {
+    #     "id": 1,
+    #     "model_id": 2,
+    #     "split_id": 0,
+    #     "data": [
+    #       {
+    #         "letter": "a"
+    #       }
+    #     ],
+    #     "created_at": "2025-03-24 20:40:39.299980"
+    #   }
+
+    # Check if the model binary for the duty exists
+    model_id = duty["model_id"]
+    file_path = os.path.join("download", f"model_{model_id}.bin")
+    if not os.path.exists(file_path):
+        logging.error(f"Model {model_id} binary does not exist.")
+        return
+
+    # Save the "data" field to a input file in the temp directory
+    input_file_path = os.path.join("temp", f"duty_{duty['id']}")
+    with open(input_file_path, "w") as input_file:
+        json.dump(duty["data"], input_file)
+
+    # Execute the model binary with the input file
+    output_file_path = os.path.join("temp", f"duty_{duty['id']}_output")
+    try:
+        subprocess.run([file_path, input_file_path, output_file_path], check=True)
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error executing model binary: {e}")
+        return
+
+    logging.info(f"Duty {duty['id']} executed.")
+
+    # Read the output file and send the result back to the server
+    with open(output_file_path, "r") as output_file:
+        output_data = output_file.read()
+        logging.info(f"Output data: {output_data}")
+
+    s.sendall(f"RESULTS {duty['id']} {duty['model_id']} {output_data}".encode("utf-8"))
+    s.sendall(f"READY".encode("utf-8"))
 
 
 def safe_exit(*args):
@@ -146,7 +206,7 @@ def safe_exit(*args):
     logging.info("Closing connection...")
     if s:
         try:
-            s.sendall("exit".encode("utf-8"))
+            s.sendall("EXIT".encode("utf-8"))
             s.close()
         except socket.error as e:
             logging.error(f"Socket error: {e}")
