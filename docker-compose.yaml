@@ -53,7 +53,7 @@ services:
 
   internal-server:
     build:
-      context: ./internal-server
+      context: ./internal_server
       dockerfile: Dockerfile
     image: civic-internal-server:latest
     container_name: civic-internal-server
