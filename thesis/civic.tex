@@ -9,6 +9,10 @@
 \pagenumbering{roman}
 \doublespacing
 
+% Lists entire bibliography regardless of citation
+\nocite{*}
+
+
 \fancyhf{}
 \fancyhead[RO,LE]{CIVIC}
 \fancyfoot[C]{\thepage}
@@ -80,15 +84,25 @@ On the client side, the Docker SDK is used once again with the \verb|client.py| 
 
 \section{Results}
 
-The results of the CIVIC framework are promising. The server component is able to successfully manage multiple citizens connected from multiple different machines and distribute instructions, models, and datasets to those citizens. As stated previously, two Python scripts, \verb|server_manager.py| and \verb|client.py|, have been bundled with the framework to facilitate the installation and management of the server and client components. These scripts have been designed with simple terminal console-like interfaces to equip both researchers and volunteers with easy to understand 
+The results of the CIVIC framework are promising. The server component is able to successfully manage multiple citizens connected from multiple different machines and distribute instructions, models, and datasets to those citizens. As stated previously, two Python scripts, \verb|server_manager.py| and \verb|client.py|, have been bundled with the framework to facilitate the installation and management of the server and client components. These scripts have been designed with simple terminal console-like interfaces to equip both researchers and volunteers with easy to understand tools to manage the server and client components respectively. 
 
-In addition to the creation of the CIVIC framework, this project has also created a proof of concept model that demonstrates the capabilities of the framework. Included in the project's repository is a simple model called Alphabet. The Alphabet model is a simple program that takes a single letter as input and returns the next letter in the alphabet as output, followed by the burning of CPU cycles for a short amount of time to simulate a heavier workload, which is typical in demonstrations of distributed computing. The model binary is written in C and compiled for Linux x86 architecture and is designed to be simple and easy to understand, making it a good starting point for researchers looking to create their own models for the CIVIC framework.
+In addition to the creation of the CIVIC framework, this project has also contains a proof of concept model that demonstrates the capabilities of the framework. Included in the project's repository is a simple model called Alphabet. The Alphabet model is a simple program that takes a single letter as input and returns the next letter in the alphabet as output, followed by the burning of CPU cycles for a short amount of time to simulate a heavier workload, which is typical in demonstrations of distributed computing. The model binary is written in C and compiled for Linux x86 architecture and is designed to be simple and easy to understand, making it a good starting point for researchers looking to create their own models for the CIVIC framework.
 
 
 \section{Discussion}
 
-\section{Bibliography}
+While the CIVIC framework provides a functional alternative to existing volunteer computing frameworks by incorporating new features like virtualization, there are several future improvements that could be made to the system. In this section of the report, a select few of these potential improvements will be discussed. 
+
+The first of these improvements is the addition of a web-based interface for the server. Currently, the server is managed through a console interface that is accessed through the server manager script. While this interface is functional, it can be difficult to use for users who are not familiar with command line interfaces. A web-based interface would allow users to manage the server through a web browser, making it more accessible to a wider audience. This could be achieved by creating a web application that communicates with the Flask middleware and PostgreSQL database to provide a user-friendly interface for managing models, duties, and clients. In addition, a web-based interface could allow for the implementation of several data visualization techniques to provide researchers an easier way to conceptualize the results of the work done without exporting the data to a separate program.
+
+One other potential improvement would be support for more specific workflows. Currently, the CIVIC framework is designed to be flexible enough to run the majority of volunteer computing projects that a researcher may be interested in creating. However, there are several specific workflows in the field of distributed computing that require more tailored functionality. For examples, we turn to other volunteer computing frameworks such as Mining@home. The Mining@home framework has been specifically designed to facilitate data mining problems, such as itemset mining and clustering. This functionality was achieved through the introduction of peer-to-peer communication between clients (referred to as miner nodes) and new server-side features to facilitate the distribution of data mining tasks, as the traditional server-client architecture is not well suited for these types of problems. The addition of features like the ones presented in Mining@home and other pre-existing specialized frameworks would allow for the CIVIC framework to be used in a wider variety of research projects.
+
+Finally, the addition of a more robust error handling and caching system could be of use in the CIVIC framework to better mitigate data and work losses from client crashes and other failures. The framework is currently designed to be fault-tolerant, but there are still several edge cases that could be improved upon. For example, if a citizen crashes while executing a duty, the server will not be able to recover the results of that duty. The introduction of a caching system, as elaborated upon in the article "A Scalable Framework for Wireless Distributed Computing", has several advantages when implemented into a distributed computing platform. Alongside the ability to better handle crashing from the client side by caching results periodically, a caching system would additionally allow for pre-fetch content to be distributed between multiple clients on a separate network, reducing the amount of data that needs to be sent from the central server.
 
 
+\newpage
+\thispagestyle{empty}
+\bibliographystyle{ieeetr}
+\bibliography{civic} 
 
 \end{document}
