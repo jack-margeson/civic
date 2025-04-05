@@ -40,10 +40,12 @@ menu_options = [
         {"key": "b", "command": "Back", "status": 1},
     ],
     [  # Manage models (3)
-        {"key": "l", "command": "List Models", "status": 1},
+        {"key": "lm", "command": "List Models", "status": 1},
         {"key": "c", "command": "Create Model", "status": 1},
         {"key": "e", "command": "Edit Model", "status": 1},
-        {"key": "d", "command": "Delete Model", "status": 1},
+        {"key": "s", "command": "Change Model Status", "status": 1},
+        {"key": "lb", "command": "List Model Binaries", "status": 1},
+        {"key": "u", "command": "Upload New Model Binary", "status": 1},
         {"key": "b", "command": "Back", "status": 1},
     ],
     [  # Manage datasets (4)
@@ -171,14 +173,18 @@ def main():
                 for item in menu_options[menu_states.MANAGE_MODELS.value]
             ):
                 match choice:
-                    case "l":
+                    case "lm":
                         list_models()
                     case "c":
                         create_model()
                     case "e":
-                        print("Edit Model")  # TODO
-                    case "d":
-                        print("Delete Model")  # TODO
+                        edit_model()
+                    case "s":
+                        change_model_status()
+                    case "lb":
+                        list_model_binaries()
+                    case "u":
+                        upload_model_binary()
                     case "b":
                         set_curr_menu(menu_states.MAIN)
             else:
@@ -529,7 +535,11 @@ def list_models():
     print("Modules:")
     response = requests.get(f"{middleware_url}/get_models")
     response.raise_for_status()
-    print_table(response.json())
+    if response.json() == []:
+        print_error("No models found.")
+        return
+    else:
+        print_table(response.json())
 
 
 def attach_to_server():
@@ -617,6 +627,205 @@ def create_model():
     else:
         print_error("Failed to upload model binary.")
 
+    return
+
+
+def select_model(print_selection=True):
+    # Check if there are any models
+    response = requests.get(f"{middleware_url}/get_models")
+    response.raise_for_status()
+    if response.json() == []:
+        print_error("No models found.")
+        return -1
+
+    # List the models
+    list_models()
+    while True:
+        model_id = input("Select model by ID: ").strip()
+
+        if not model_id:
+            print_error("Model ID cannot be empty.")
+            continue
+
+        # Check if the model ID is valid
+        response = requests.get(f"{middleware_url}/get_model/{model_id}")
+        if response.json() != []:
+            break
+        else:
+            print_error("Model ID not found.")
+            continue
+
+    # Get the model details
+    response = requests.get(f"{middleware_url}/get_model/{model_id}")
+    response.raise_for_status()
+    model = response.json()
+    if print_selection:
+        print("Model details:")
+        print_table(model)
+    return model
+
+
+def edit_model():
+    # Select model
+    model = select_model()
+    if model == -1:
+        return
+    # Get the new model details
+    model_name = input(
+        "Enter the new name of the model (leave blank to keep current): "
+    ).strip()
+    if not model_name:
+        model_name = model[1]["name"]
+    model_display_name = input(
+        "Enter the new display name of the model (leave blank to keep current): "
+    ).strip()
+    if not model_display_name:
+        model_display_name = model[1]["display_name"]
+    model_description = input(
+        "Enter the new description of the model (leave blank to keep current): "
+    ).strip()
+    if not model_description:
+        model_description = model[1]["description"]
+
+    # Create the model payload
+    model_payload = {
+        "name": model_name,
+        "display_name": model_display_name,
+        "description": model_description,
+    }
+    # Send the model payload to the server
+    print("Editing model...")
+    response = requests.put(
+        f"{middleware_url}/edit_model/{model[1]["model_id"]}", json=model_payload
+    )
+    response.raise_for_status()
+    if response.status_code == 200:
+        print_success("Model edited successfully.")
+    else:
+        print_error("Failed to edit model.")
+    return
+
+
+def change_model_status():
+    # Select model
+    model = select_model()
+    if model == -1:
+        return
+    # Get the new model status
+    print(
+        "Changing the model status indicates whether or not the server should be allowed to distribute the model to citizens. "
+        "\nWhen the model is inactive, it will be unavailable for distribution, but the model will still be available for editing."
+    )
+    while True:
+        model_status = (
+            input("Enter the new status of the model (active/inactive): ")
+            .strip()
+            .lower()
+        )
+        if model_status not in ["active", "inactive"]:
+            print_error("Invalid model status.")
+            continue
+        else:
+            model_status = 1 if model_status == "active" else 0
+            break
+    # Call the API to change the model status
+    print("Changing model status...")
+    response = requests.put(
+        f"{middleware_url}/change_model_status/{model[1]['model_id']}",
+        json={"status": model_status},
+    )
+    response.raise_for_status()
+    if response.status_code == 200:
+        print_success("Model status changed successfully.")
+    else:
+        print_error("Failed to change model status.")
+    return
+
+
+def list_model_binaries():
+    # Select model
+    model = select_model(print_selection=False)
+    if model == -1:
+        return
+    # Get all of the binaries for this model by id
+    response = requests.get(
+        f"{middleware_url}/get_model_binaries/{model[0]['model_id']}"
+    )
+    response.raise_for_status()
+    if response.json() == []:
+        print_error("No binaries found for this model.")
+        return
+
+    model_binaries = response.json()
+    print("Model binaries:")
+    print_table(model_binaries)
+    return
+
+
+def upload_model_binary():
+    # Select model
+    model = select_model(print_selection=False)
+    if model == -1:
+        return
+    # Get all of the binaries for this model by id
+    response = requests.get(
+        f"{middleware_url}/get_model_binaries/{model[0]['model_id']}"
+    )
+    response.raise_for_status()
+    if response.json() == []:
+        print_error("No binaries found for this model.")
+        return
+
+    model_binaries = response.json()
+
+    # Find the latest version
+    latest_version = 0
+    for binary in model_binaries:
+        if binary["version"] > latest_version:
+            latest_version = binary["version"]
+
+    print(
+        f"\nThe current binary version for this model is v{latest_version}. \
+          \nFuture distributions of this model will use the provided v{latest_version+1} version of the binary.\n"
+    )
+    # Increment the version
+    latest_version += 1
+    # Get the new model binary path
+    while True:
+        model_binary_path = input(
+            "Enter the path to the new model binary (v{}): ".format(latest_version)
+        ).strip()
+        if not os.path.exists(model_binary_path):
+            print_error("Model binary not found.")
+        else:
+            # Check if the file is a valid binary
+            with open(model_binary_path, "rb") as f:
+                binary_data = f.read()
+                if not binary_data:
+                    print_error("Model binary is empty.")
+                else:
+                    break
+    # Create the model binary payload
+    # Read and encode binary file
+    with open(model_binary_path, "rb") as f:
+        binary_data = f.read()
+        encoded_data = base64.b64encode(binary_data).decode("utf-8")
+    model_binary_payload = {
+        "version": latest_version,
+        "encoded_data": encoded_data,
+    }
+    # Send the model binary payload to the server
+    print("Uploading model binary...")
+
+    response = requests.post(
+        f"{middleware_url}/upload_model_binary/{model[0]['model_id']}",
+        json=model_binary_payload,
+    )
+    response.raise_for_status()
+    if response.status_code == 201:
+        print_success("Model binary uploaded successfully.")
+    else:
+        print_error("Failed to upload model binary.")
     return
 
 

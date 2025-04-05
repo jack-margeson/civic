@@ -41,6 +41,62 @@ def get_models():
     return db_query("SELECT * FROM models")
 
 
+@app.route("/get_model/<int:model_id>", methods=["GET"])
+@cross_origin()
+def get_model(model_id):
+    return db_query("SELECT * FROM models WHERE model_id = %s;" % model_id)
+
+
+@app.route("/edit_model/<int:model_id>", methods=["PUT"])
+@cross_origin()
+def edit_model(model_id):
+    # Parse request data
+    model_name = request.json.get("name")
+    model_display_name = request.json.get("display_name")
+    model_description = request.json.get("description")
+
+    if not model_name or not model_display_name or not model_description:
+        return Response("Invalid model payload", status=400)
+
+    # Update the model in the database
+    query = f"""
+        UPDATE models
+        SET name = '{model_name}', display_name = '{model_display_name}', description = '{model_description}'
+        WHERE model_id = {model_id}
+        RETURNING *;
+    """
+    return db_query(query)
+
+
+@app.route("/change_model_status/<int:model_id>", methods=["PUT"])
+@cross_origin()
+def change_model_status(model_id):
+    # Parse request data
+    status = request.json.get("status")
+
+    if status not in [0, 1]:
+        return Response("Invalid status payload", status=400)
+
+    # Update the model in the database
+    query = f"""
+        UPDATE models
+        SET status = {status}
+        WHERE model_id = {model_id}
+        RETURNING *;
+    """
+    return db_query(query)
+
+
+@app.route("/get_model_binaries/<int:model_id>", methods=["GET"])
+@cross_origin()
+def get_model_binaries(model_id):
+    # Get all binaries for the model
+    query = (
+        f"SELECT * FROM model_binaries WHERE model_id = {model_id} ORDER BY version;"
+    )
+    return db_query(query)
+
+
 @app.route("/clients", methods=["POST"])
 @cross_origin()
 def add_client():
