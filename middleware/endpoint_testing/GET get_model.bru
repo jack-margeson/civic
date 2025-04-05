@@ -5,7 +5,11 @@ meta {
 }
 
 get {
-  url: 
+  url: http://localhost:5000/get_model/:model_id
   body: none
   auth: none
+}
+
+params:path {
+  model_id: 3
 }
