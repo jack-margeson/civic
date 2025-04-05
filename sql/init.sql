@@ -17,6 +17,14 @@ CREATE TABLE models (
     status INTEGER NOT NULL DEFAULT 1 -- 0: inactive, 1: active
 ); 
 
+CREATE TABLE model_binaries (
+    id SERIAL PRIMARY KEY,
+    model_id INTEGER NOT NULL REFERENCES models(model_id),
+    version INTEGER NOT NULL,
+    binary_data bytea NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE clients (
     id SERIAL PRIMARY KEY,
     client_uuid UUID UNIQUE DEFAULT gen_random_uuid(),
@@ -41,14 +49,6 @@ BEFORE UPDATE ON clients
 FOR EACH ROW
 WHEN (OLD.status IS DISTINCT FROM NEW.status)
 EXECUTE FUNCTION update_last_connected_at();
-
-CREATE TABLE model_binaries (
-    id SERIAL PRIMARY KEY,
-    model_id INTEGER NOT NULL REFERENCES models(model_id),
-    version INTEGER NOT NULL,
-    binary_data bytea NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
 
 CREATE OR REPLACE FUNCTION create_model_related_tables() RETURNS TRIGGER AS $$
 BEGIN

@@ -6,6 +6,7 @@
 # keeps track of connected internal_clients
 # stores data in postgres database
 
+import base64
 import os
 import json
 from waitress import serve
@@ -88,6 +89,98 @@ def download_binary(model_id):
 def get_dataset(model_id):
     query = f"SELECT * FROM model_{model_id}_data;"
     return db_query(query)
+
+
+@app.route("/create_model", methods=["POST"])
+@cross_origin()
+def create_model():
+    try:
+        # Parse request data
+        model_name = request.json.get("name")
+        model_display_name = request.json.get("name")
+        model_description = request.json.get("description")
+
+        if not model_name or not model_display_name or not model_description:
+            return Response("Invalid model payload", status=400)
+
+        # Get the next model_id
+        cur = db.cursor()
+        cur.execute("SELECT MAX(model_id) FROM models;")
+        max_model_id = cur.fetchone()[0]
+        if max_model_id is None:
+            max_model_id = 0
+        model_id = max_model_id + 1
+
+        # Insert the model into the database
+        cur.execute(
+            "INSERT INTO models (model_id, name, display_name, description) VALUES (%s, %s, %s, %s) RETURNING model_id;",
+            (model_id, model_name, model_display_name, model_description),
+        )
+        model_id = cur.fetchone()[0]
+        app.logger.info(f"Model created with ID: {model_id}")
+
+        # Get JSON representation of the model
+        cur.execute(f"SELECT json_agg(models) FROM models WHERE model_id = {model_id};")
+        response = cur.fetchone()[0]
+
+        db.commit()
+        cur.close()
+
+        app.logger.info(f"Model response: {response}")
+        return Response(
+            json.dumps(response[0], default=str),
+            mimetype="application/json",
+            status=201,
+        )
+    except Exception as e:
+        app.logger.error(f"Error creating model: {e}")
+        return Response("Invalid model payload", status=400)
+
+
+@app.route("/upload_model_binary/<int:model_id>", methods=["POST"])
+@cross_origin()
+def upload_binary(model_id):
+    # Parse the request data
+    try:
+        version = request.json.get("version")
+        encoded_data = request.json.get("encoded_data")
+
+        if not encoded_data:
+            return Response("Invalid binary payload", status=400)
+
+        app.logger.info(f"{encoded_data}")
+        # Convert binary data in base64 to bytes
+        binary_data = base64.b64decode(encoded_data)
+
+        # Insert into model_binaries table
+        cur = db.cursor()
+        cur.execute(
+            "INSERT INTO model_binaries (model_id, version, binary_data) VALUES (%s, %s, %s) RETURNING id;",
+            (model_id, version, binary_data),
+        )
+        binary_id = cur.fetchone()[0]
+        app.logger.info(f"Binary uploaded with ID: {binary_id}")
+
+        # Get JSON representation of the binary
+        cur.execute(
+            f"SELECT json_agg(json_build_object('id', model_binaries.id, 'model_id', model_binaries.model_id, 'version', model_binaries.version)) FROM model_binaries WHERE id = {binary_id};"
+        )
+        response = cur.fetchone()[0]
+
+        db.commit()
+        cur.close()
+
+        app.logger.info(f"Binary response: {response}")
+
+        # Return the response
+        return Response(
+            json.dumps(response[0], default=str),
+            mimetype="application/json",
+            status=201,
+        )
+    except Exception as e:
+        app.logger.error(f"Error uploading binary: {e}")
+        return Response(f"Error uploading binary: {e}", status=500)
 
 
 @app.route("/create_dataset/<int:model_id>", methods=["POST"])

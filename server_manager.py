@@ -4,6 +4,7 @@
 # talks directly to internal_clients to issue work orders and receive data
 # stores data in postgresql database through the middleware server
 
+import base64
 import os
 import json
 import requests
@@ -173,7 +174,7 @@ def main():
                     case "l":
                         list_models()
                     case "c":
-                        print("Create Model")  # TODO
+                        create_model()
                     case "e":
                         print("Edit Model")  # TODO
                     case "d":
@@ -542,6 +543,81 @@ def attach_to_server():
         )
     except Exception as e:
         print_error(f"Failed to attach to the server: {e}")
+
+
+def create_model():
+    while True:
+        model_name = input("Enter the name of the model: ").strip()
+        if not model_name:
+            print_error("Model name cannot be empty.")
+        else:
+            break
+    model_display_name = input(
+        "Enter the display name of the model (optional): "
+    ).strip()
+    if not model_display_name:
+        model_display_name = model_name
+    model_description = input(
+        "Enter a short description of the model (optional): "
+    ).strip()
+    if not model_description:
+        model_description = "n/a"
+
+    while True:
+        model_init_binary_path = input(
+            "Enter the path to the initial model binary (v1): "
+        ).strip()
+        if not os.path.exists(model_init_binary_path):
+            print_error("Model binary not found.")
+        else:
+            # Check if the file is a valid binary
+            with open(model_init_binary_path, "rb") as f:
+                binary_data = f.read()
+                if not binary_data:
+                    print_error("Model binary is empty.")
+                else:
+                    break
+
+    # Create the model payload
+    model_payload = {
+        "name": model_name,
+        "display_name": model_display_name,
+        "description": model_description,
+    }
+    # Create model binary payload
+    # Read and encode binary file
+    with open(model_init_binary_path, "rb") as f:
+        binary_data = f.read()
+        encoded_data = base64.b64encode(binary_data).decode("utf-8")
+    model_binary_payload = {
+        "version": 1,
+        "encoded_data": encoded_data,
+    }
+
+    # Send the model payload to the server
+    print("Creating model...")
+    response = requests.post(f"{middleware_url}/create_model", json=model_payload)
+    response.raise_for_status()
+    if response.status_code == 201:
+        print_success("Model created successfully.")
+        # Append the returned model ID to the payload
+        model_binary_payload["model_id"] = response.json()["model_id"]
+    else:
+        print_error("Failed to create model.")
+
+    # Send the model binary payload to the server
+    print("Uploading model binary...")
+    response = requests.post(
+        f"{middleware_url}/upload_model_binary/{model_binary_payload['model_id']}",
+        json=model_binary_payload,
+    )
+    response.raise_for_status()
+    if response.status_code == 201:
+        print_success("Model binary uploaded successfully.")
+    else:
+        print_error("Failed to upload model binary.")
+
+    return
 
 
 def create_dataset():

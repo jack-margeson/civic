@@ -1,0 +1,19 @@
+meta {
+  name: POST create_model
+  type: http
+  seq: 4
+}
+
+post {
+  url: http://localhost:5000/create_model
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "test_model",
+    "display_name": "Test Model",
+    "description": "n/a"
+  }
+}
