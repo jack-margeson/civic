@@ -79,13 +79,6 @@ AFTER INSERT ON models
 FOR EACH ROW
 EXECUTE FUNCTION create_model_related_tables();
 
-
--- CREATE EXAMPLE MODEL HELLO WORLD
-
--- INSERT INTO models (model_id, name, display_name, description) VALUES (1, 'hello', 'Hello World', 'A simple hello world executable');    
--- INSERT INTO model_binaries (model_id, version, binary_data) VALUES (1, 1, pg_read_binary_file('/docker-entrypoint-initdb.d/binary_testing/hello.o')
--- );
-
 -- CREATE EXAMPLE MODEL ALPHABET
 
 INSERT INTO models (model_id, name, display_name, description) VALUES (1, 'alphabet', 'Alphabet', 'Alphabet testing program');
