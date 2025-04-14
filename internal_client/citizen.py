@@ -18,6 +18,8 @@ s = None
 listener_thread = None
 
 
+# main()
+# Configures the citizen, connects to the CIVIC server, and starts listening for messages.
 def main():
     configure()
     connect_to_server()
@@ -25,6 +27,9 @@ def main():
         listener_thread.join()  # Wait for the listener thread to complete
 
 
+# configure()
+# Configures the citizen by loading environment variables and creating necessary directories.
+# It also loads the citizen's UUID from a file if it exists.
 def configure():
     global CIVIC_SERVER_IP, CIVIC_SERVER_PORT
     CIVIC_SERVER_IP = os.getenv("CIVIC_SERVER_IP")
@@ -33,7 +38,7 @@ def configure():
         logging.fatal("CIVIC_SERVER_IP and CIVIC_SERVER_PORT must be set.")
         sys.exit(1)
 
-    # Load the client's UUID from a file if it exists
+    # Load the citizens's UUID from a file if it exists
     if os.path.exists("citizen_uuid"):
         with open("citizen_uuid", "r") as uuid_file:
             global CLIENT_UUID
@@ -45,6 +50,10 @@ def configure():
     os.makedirs("temp", exist_ok=True)
 
 
+# connect_to_server()
+# Connects to the CIVIC server using the provided IP and port.
+# It sends the UUID if it exists or requests a new one from the server.
+# It also starts a thread to listen for messages from the server.
 def connect_to_server():
     global s, listener_thread
 
@@ -72,6 +81,10 @@ def connect_to_server():
         logging.error(f"Socket error: {e}")
 
 
+# listen_for_messages()
+# Listens for messages from the server and handles them accordingly.
+# Spawned by connect_to_server() in a separate thread.
+# It handles messages for UUID, model binary download, execution of binaries, duties, and server shutdown.
 def listen_for_messages():
     global s
     while True:
@@ -102,6 +115,8 @@ def listen_for_messages():
             break
 
 
+# download_binary()
+# Downloads the model binary from the server.
 def download_binary(message):
     global s
 
@@ -133,6 +148,9 @@ def download_binary(message):
     )
 
 
+# execute_binary()
+# Executes the model binary received from the server.
+# Primarily used for testing purposes.
 def execute_binary(message):
     global s
 
@@ -150,6 +168,13 @@ def execute_binary(message):
     logging.info(f"Model {model_id} binary executed.")
 
 
+# execute_duty()
+# Executes a duty received from the server.
+# It saves the duty data to a file, executes the model binary with the input file,
+# and sends the results back to the server.
+# It also handles the case where the model binary does not exist.
+# The duty is expected to be in JSON format.
+# Runs when an "EXECUTE" message is received from the server.
 def execute_duty(message):
     global s
 
@@ -201,6 +226,8 @@ def execute_duty(message):
     s.sendall(f"READY".encode("utf-8"))
 
 
+# safe_exit()
+# Safely exits the program and closes the socket connection.
 def safe_exit(*args):
     global s
     logging.info("Closing connection...")

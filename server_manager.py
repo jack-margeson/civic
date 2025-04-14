@@ -1,9 +1,3 @@
-# creates server instance (flask middleware, postgresql database, etc)
-# handles model creation, editing, deletion
-# talks to the middleware server to pass along model data
-# talks directly to internal_clients to issue work orders and receive data
-# stores data in postgresql database through the middleware server
-
 import base64
 import os
 import json
@@ -17,6 +11,7 @@ import csv
 
 VERSION = "v0.1.0"
 
+# Define menu options and states
 menu_options = [
     [  # Global commands (0)
         {"key": "h", "command": "Help", "status": 1},
@@ -75,6 +70,9 @@ client = docker.DockerClient(base_url=docker_host)
 middleware_url = "http://localhost:5000"
 
 
+# main()
+# Handles the main loop of the server manager.
+# It initializes the server manager, prints the menu, and handles user input.
 def main():
     os.system("clear")
     print_header()
@@ -221,12 +219,16 @@ def main():
         update_menu_state()
 
 
+# set_curr_menu()
+# Helper function to set the current menu and print it
 def set_curr_menu(menu_index):
     global curr_menu
     curr_menu = menu_index
     print_menu(curr_menu)
 
 
+# print_header()
+# Helper function to print the header
 def print_header():
     header = "CIVIC Server Manager {}".format(Fore.YELLOW + VERSION)
     print(Fore.GREEN + "=" * 30)
@@ -235,6 +237,9 @@ def print_header():
     print(Style.RESET_ALL)
 
 
+# print_menu()
+# Helper function to print the menu
+# It takes the menu index, header flag, and clear flag as arguments.
 def print_menu(menu_index=menu_states.MAIN, header=False, clear=False):
     menu_index = menu_index.value
 
@@ -284,14 +289,21 @@ def print_menu(menu_index=menu_states.MAIN, header=False, clear=False):
     print(Style.RESET_ALL)
 
 
+# print_success()
+# Helper function to print success messages
 def print_success(message):
     print(Fore.GREEN + message + Style.RESET_ALL + "\n")
 
 
+# print_error()
+# Helper function to print error messages
 def print_error(message):
     print(Fore.RED + message + Style.RESET_ALL + "\n")
 
 
+# print_table()
+# Helper function to print a table
+# It takes a list of dictionaries as input and formats it into a table using prettytable.
 def print_table(data):
     headers = list(data[0].keys())
     data.insert(0, headers)
@@ -299,6 +311,9 @@ def print_table(data):
     print(table, "\n")
 
 
+# update_menu_state()
+# Helper function to update the menu state
+# It checks the status of the CIVIC server and updates the menu options accordingly.
 def update_menu_state():
     global client
 
@@ -350,11 +365,15 @@ def update_menu_state():
         menu_options[2][2]["status"] = 0
 
 
+# init_server_manager()
+# Initializes the server manager (currently, just updates the menu state).
 def init_server_manager():
     print("Initializing server manager...")
     update_menu_state()
 
 
+# install_civic_server()
+# Installs the CIVIC server by building the images, creating the network and volume, and starting the containers.
 def install_civic_server():
     global client
 
@@ -457,6 +476,8 @@ def install_civic_server():
     print_success("CIVIC Server installed!")
 
 
+# uninstall_civic_server()
+# Uninstalls the CIVIC server by stopping and removing the containers, network, and volume.
 def uninstall_civic_server(quiet=False):
     global client
 
@@ -502,6 +523,8 @@ def uninstall_civic_server(quiet=False):
         print(Fore.RED + "CIVIC Server uninstalled.\n" + Style.RESET_ALL)
 
 
+# start_server()
+# Starts the CIVIC server by starting the containers.
 def start_server():
     global client
     print("Starting the CIVIC server...")
@@ -517,6 +540,8 @@ def start_server():
     print_success("CIVIC Server started.")
 
 
+# stop_server()
+# Stops the CIVIC server by stopping the containers.
 def stop_server():
     global client
     print("Stopping the CIVIC server...")
@@ -531,6 +556,8 @@ def stop_server():
     print_error("CIVIC Server stopped.")
 
 
+# list_models()
+# Lists all the models in the server by calling the API and printing the results in a table.
 def list_models():
     print("Modules:")
     response = requests.get(f"{middleware_url}/get_models")
@@ -542,6 +569,9 @@ def list_models():
         print_table(response.json())
 
 
+# attach_to_server()
+# Attaches to the server console by using the Docker attach command.
+# It allows the user to interact with the internal server console.
 def attach_to_server():
     try:
         # print("Attaching to the server. Press Ctrl+D to detach.")
@@ -555,6 +585,9 @@ def attach_to_server():
         print_error(f"Failed to attach to the server: {e}")
 
 
+# create_model()
+# Creates a new model by prompting the user for the model details and uploading the model binary.
+# It sends the model payload to the API middleware and handles the response.
 def create_model():
     while True:
         model_name = input("Enter the name of the model: ").strip()
@@ -630,6 +663,8 @@ def create_model():
     return
 
 
+# select_model()
+# Selects a model by prompting the user for the model ID.
 def select_model(print_selection=True):
     # Check if there are any models
     response = requests.get(f"{middleware_url}/get_models")
@@ -665,6 +700,9 @@ def select_model(print_selection=True):
     return model
 
 
+# edit_model()
+# Edits an existing model by prompting the user for the new model details.
+# It sends the model payload to the API middleware and handles the response.
 def edit_model():
     # Select model
     model = select_model()
@@ -706,6 +744,9 @@ def edit_model():
     return
 
 
+# change_model_status()
+# Changes the model status by prompting the user for the new model status.
+# It sends the model status to the API middleware and handles the response.
 def change_model_status():
     # Select model
     model = select_model()
@@ -742,6 +783,8 @@ def change_model_status():
     return
 
 
+# list_model_binaries()
+# Lists all the model binaries for a specific model by calling the API and printing the results in a table.
 def list_model_binaries():
     # Select model
     model = select_model(print_selection=False)
@@ -762,6 +805,9 @@ def list_model_binaries():
     return
 
 
+# upload_model_binary()
+# Uploads a new model binary by prompting the user for the new model binary path.
+# Encodes the binary file in base64 and sends it to the API middleware.
 def upload_model_binary():
     # Select model
     model = select_model(print_selection=False)
@@ -829,6 +875,9 @@ def upload_model_binary():
     return
 
 
+# create_dataset()
+# Creates a new dataset by prompting the user for the dataset details.
+# It sends the dataset payload to the API middleware and handles the response.
 def create_dataset():
     list_models()
     model_id = input(
@@ -945,11 +994,15 @@ def create_dataset():
         return
 
 
+# safe_exit()
+# Helper function to safely exit the program
 def safe_exit():
     print("Exiting...")
     exit(0)
 
 
+# signal_handler()
+# Handles the SIGINT signal (Ctrl+C) and calls the safe_exit function
 def signal_handler(sig, frame):
     safe_exit()
 

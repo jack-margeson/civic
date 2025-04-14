@@ -1,10 +1,59 @@
-# hosts the middleware for a civic server
-# hosts a REST API for internal_clients to communicate with via flask (send data, get data, etc)
-# handles model updates
-# handles model deletions
-# hosts model downloads
-# keeps track of connected internal_clients
-# stores data in postgres database
+"""
+Flask API Routes:
+
+1. Health Check:
+    - `GET /`
+    - Returns a simple "200 OK" response to indicate the server is running.
+
+2. Models:
+    - `GET /get_models`
+      - Retrieves all models from the database.
+    - `GET /get_model/<int:model_id>`
+      - Retrieves a specific model by its ID.
+    - `PUT /edit_model/<int:model_id>`
+      - Updates the details of a specific model.
+      - Request JSON: {"name": str, "display_name": str, "description": str}
+    - `PUT /change_model_status/<int:model_id>`
+      - Updates the status of a specific model (0 or 1).
+      - Request JSON: {"status": int}
+    - `POST /create_model`
+      - Creates a new model in the database.
+      - Request JSON: {"name": str, "display_name": str, "description": str}
+
+3. Model Binaries:
+    - `GET /get_model_binaries/<int:model_id>`
+      - Retrieves all binaries for a specific model, ordered by version.
+    - `GET /download_binary/<int:model_id>`
+      - Downloads the latest binary for a specific model.
+    - `POST /upload_model_binary/<int:model_id>`
+      - Uploads a binary for a specific model.
+      - Request JSON: {"version": str, "encoded_data": str (base64)}
+
+4. Datasets:
+    - `GET /dataset/<int:model_id>`
+      - Retrieves the dataset for a specific model.
+    - `POST /create_dataset/<int:model_id>`
+      - Creates a dataset for a specific model.
+      - Request JSON: {"type": str, "data": list, "split": int, "replication": bool, "replication_percentage": int, "shuffle": bool}
+
+5. Clients:
+    - `GET /clients`
+      - Retrieves all clients.
+    - `POST /clients`
+      - Adds a new client.
+      - Request JSON: {"ip": str, "port": str}
+    - `PUT /clients/<client_uuid>/deactivate`
+      - Deactivates a specific client.
+    - `PUT /clients/<client_uuid>/activate`
+      - Activates a specific client.
+
+6. Results:
+    - `GET /results/<int:model_id>`
+      - Retrieves results for a specific model.
+    - `POST /upload_result/<int:model_id>`
+      - Uploads a result for a specific model.
+      - Request JSON: {"client_uuid": str, "id": int, "data": dict}
+"""
 
 import base64
 import os

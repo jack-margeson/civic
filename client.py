@@ -1,8 +1,3 @@
-# communicates with servers
-# has list of downloadable models from server
-# handles downloading of models
-# docker setup (create citizen) based on model
-
 import os
 import docker
 import json
@@ -13,6 +8,7 @@ import prettytable
 
 VERSION = "v0.1.0"
 
+# Define menu options and states
 menu_options = [
     [  # Global commands (0)
         {"key": "h", "command": "Help", "status": 1},
@@ -45,6 +41,9 @@ client = docker.DockerClient(base_url=docker_host)
 citizen_containers = []
 
 
+# main()
+# Main function to run the client
+# It initializes the client, sets the current menu, and handles user input.
 def main():
     os.system("clear")
     print_header()
@@ -134,12 +133,16 @@ def main():
                     print_error("Command not recognized. Please try again.")
 
 
+# set_curr_menu()
+# Helper function to set the current menu and print it
 def set_curr_menu(menu_index):
     global curr_menu
     curr_menu = menu_index
     print_menu(curr_menu)
 
 
+# print_header()
+# Helper function to print the header
 def print_header():
     header = "CIVIC Client {}".format(Fore.YELLOW + VERSION)
     print(Fore.GREEN + "=" * 30)
@@ -148,6 +151,9 @@ def print_header():
     print(Style.RESET_ALL)
 
 
+# print_menu()
+# Helper function to print the menu
+# It takes the menu index, header flag, and clear flag as arguments.
 def print_menu(menu_index=menu_states.MAIN, header=False, clear=False):
     menu_index = menu_index.value
 
@@ -197,10 +203,15 @@ def print_menu(menu_index=menu_states.MAIN, header=False, clear=False):
     print(Style.RESET_ALL)
 
 
+# print_error()
+# Helper function to print error messages
 def print_error(message):
     print(Fore.RED + message + Style.RESET_ALL + "\n")
 
 
+# print_table()
+# Helper function to print a table
+# It takes a list of dictionaries as input and formats it into a table using prettytable.
 def print_table(data):
     headers = list(data[0].keys())
     data.insert(0, headers)
@@ -208,6 +219,10 @@ def print_table(data):
     print(table, "\n")
 
 
+# update_citizen_list()
+# Updates the list of citizen containers
+# It retrieves all containers from the Docker client and filters them based on their names.
+# It updates the global citizen_containers variable with the filtered list.
 def update_citizen_list():
     global client, citizen_containers
     citizen_containers = []
@@ -216,6 +231,10 @@ def update_citizen_list():
             citizen_containers.append(container)
 
 
+# init_client()
+# Initializes the client:
+# It checks if the Docker image for the client exists, and if not, builds it.
+# It also updates the list of citizen containers.
 def init_client():
     global client
 
@@ -236,6 +255,11 @@ def init_client():
     print("Client initialized.")
 
 
+# create_citizen()
+# Creates a new citizen container
+# It prompts the user for the server IP and port, and creates a new container with a unique ID.
+# It also updates the list of citizen containers.
+# It uses the Docker client to run the container with the specified environment variables.
 def create_citizen():
     global client
 
@@ -267,6 +291,8 @@ def create_citizen():
     update_citizen_list()
 
 
+# list_citizens()
+# Lists all citizen containers in a table format
 def list_citizens():
     print("Listing citizens...")
     update_citizen_list()
@@ -288,6 +314,9 @@ def list_citizens():
         print("No citizens found.\n")
 
 
+# delete_citizen()
+# Deletes a citizen container
+# It prompts the user for the ID of the citizen to delete and stops and removes the container.
 def delete_citizen():
     list_citizens()
     citizen_id = input("Enter the ID of the citizen to delete: ").strip()
@@ -318,6 +347,11 @@ def delete_citizen():
         print_error("Citizen ID not found.")
 
 
+# start_citizen()
+# Starts a citizen container
+# It prompts the user for the ID of the citizen to start and starts the container if it is stopped.
+# It updates the list of citizen containers after starting.
+# It uses the Docker client to start the container.
 def start_citizen():
     list_citizens()
     citizen_id = input("Enter the ID of the citizen to start: ").strip()
@@ -341,6 +375,11 @@ def start_citizen():
         print_error("Citizen ID not found.")
 
 
+# stop_citizen()
+# Stops a citizen container
+# It prompts the user for the ID of the citizen to stop and stops the container if it is running.
+# It updates the list of citizen containers after stopping.
+# It uses the Docker client to stop the container.
 def stop_citizen():
     list_citizens()
     citizen_id = input("Enter the ID of the citizen to stop: ").strip()
@@ -364,11 +403,15 @@ def stop_citizen():
         print_error("Citizen ID not found.")
 
 
+# safe_exit()
+# Safely exits the program.
 def safe_exit():
     print("Exiting...")
     exit(0)
 
 
+# signal_handler()
+# Signal handler for SIGINT (Ctrl+C)
 def signal_handler(sig, frame):
     safe_exit()
 

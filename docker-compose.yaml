@@ -1,3 +1,7 @@
+# Don't use this file directly! Install the CIVIC server using the
+# server_manager.py script instead, which handles the building and
+# configuration of the services and their dependencies.
+
 services:
   middleware:
     build:

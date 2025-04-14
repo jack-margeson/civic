@@ -13,6 +13,8 @@ import queue
 middleware_url = "http://civic-middleware:5000"
 
 
+# CursesLoggerHandler
+# Custom logging handler to display logs in a curses window
 class CursesLoggerHandler(logging.Handler):
     def __init__(self, stdscr):
         super().__init__()
@@ -39,6 +41,8 @@ class CursesLoggerHandler(logging.Handler):
             self.handleError(record)
 
 
+# Define the CIVICServer class
+# This class handles the server-side operations, including client connections,
 class CIVICServer:
     def __init__(self, stdscr, host="0.0.0.0", port=24842):
         self.stdscr = stdscr
@@ -54,6 +58,9 @@ class CIVICServer:
         # Init. the server
         self.init_server()
 
+    # init_server()
+    # Initializes the server by creating a "download" folder, setting up logging,
+    # and starting the server socket.
     def init_server(self):
         # Create a "download" folder if it doesn't exist
         if not os.path.exists("download"):
@@ -72,6 +79,10 @@ class CIVICServer:
         self.server_socket.listen(5)
         logging.info(f"Server started on {self.host}:{self.port}")
 
+    # handle_server_commands()
+    # Handles server commands entered by the user in the terminal.
+    # It uses the curses library to create a command input window at the bottom of the screen.
+    # It listens for user input and sends input to the parse_server_command() function.
     def handle_server_commands(self):
         try:
             curses.curs_set(1)
@@ -120,6 +131,9 @@ class CIVICServer:
             except Exception as e:
                 logging.error(f"Error handling input: {e}")
 
+    # parse_server_command()
+    # Parses the server command entered by the user and executes the corresponding function.
+    # Receives input from the handle_server_commands() thread.
     def parse_server_command(self, command):
         args = command.split()
         cmd = args[0].lower()
@@ -127,10 +141,21 @@ class CIVICServer:
 
         if cmd in ["help", "h"]:
             logging.info("Available commands:")
-            logging.info("  clients - List all connected clients.")
-            logging.info("  models - List all available models.")
+            logging.info("  help, h - Show this help message.")
+            logging.info("  citizens - List all connected citizens.")
+            logging.info("  models, lm - List all available models.")
             logging.info("  download <model_id> - Download a model's binary by its ID.")
+            logging.info(
+                "  distribute <model_id> <range_start> <range_end> - Distribute a model binary to a range of clients."
+            )
+            logging.info(
+                "  execute <model_id> <range_start> <range_end> - Execute a model binary on a range of clients."
+            )
+            logging.info(
+                "  generate_duties <model_id> <range_start> <range_end> - Generate duties for a model and distribute them to clients."
+            )
             logging.info("  shutdown - Shut down the server.")
+            logging.info("  exit, quit, q - Detach from the server console.")
         elif cmd in ["exit", "quit", "q"]:
             logging.info("To detach from the server console, use Ctrl+D.")
         elif cmd in ["clients", "citizens", "lc"]:
@@ -175,6 +200,10 @@ class CIVICServer:
         else:
             logging.info(f"Command not recognized: {command}")
 
+    # handle_client()
+    # Handles a new client connection and manages communication with the client.
+    # It receives messages from the client, updates the database with the client's connection status,
+    # and sends duties to the client.
     def handle_client(self, client_socket, address):
         # Handle a new client connection
         logging.info(f"New connection from {address}")
@@ -257,6 +286,10 @@ class CIVICServer:
                 )
                 break
 
+    # db_update_client_connection()
+    # Updates the database with the client's connection information.
+    # It handles both new and existing clients, as well as client disconnections.
+    # It uses the requests library to send HTTP requests to the middleware.
     def db_update_client_connection(
         self,
         ip,
@@ -305,6 +338,10 @@ class CIVICServer:
                 )
                 raise
 
+    # start()
+    # Starts the server and listens for incoming connections.
+    # It spawns a new thread for each client connection and handles server commands.
+    # It also handles server shutdown and cleanup.
     def start(self):
         logging.info("Server is running and waiting for connections...")
         self.server_command_thread = threading.Thread(
@@ -318,6 +355,11 @@ class CIVICServer:
             )
             client_thread.start()
 
+    # safe_exit()
+    # Handles server shutdown and cleanup.
+    # It closes all client connections, notifies clients of the shutdown,
+    # and closes the server socket.
+    # It also handles cleanup of the curses window.
     def safe_exit(self, *_):
         logging.info("Exiting server...")
         self.server_running = False
@@ -346,6 +388,8 @@ class CIVICServer:
         curses.endwin()
         exit(0)
 
+    # print_table()
+    # Helper function to print a table using the prettytable library.
     def print_table(self, data):
         headers = list(data[0].keys())
         data.insert(0, headers)
@@ -355,6 +399,8 @@ class CIVICServer:
 
     ### SERVER COMMANDS ###
 
+    # list_clients()
+    # Lists all connected clients and their status.
     def list_clients(self, all_clients=True):
         # TODO: Implement all_clients functionality--another endpoint?
         logging.info("Listing clients...")
@@ -365,6 +411,8 @@ class CIVICServer:
         else:
             logging.info("No clients found.")
 
+    # list_models()
+    # Lists all available models and their status.
     def list_models(self, all_models=True):
         logging.info("Listing models...")
         response = requests.get(f"{middleware_url}/get_models")
@@ -374,6 +422,8 @@ class CIVICServer:
         else:
             logging.info("No models found.")
 
+    # download_binary()
+    # Downloads the model binary from the middleware server.
     def download_binary(self, model_id):
         try:
             response = requests.get(
@@ -392,6 +442,8 @@ class CIVICServer:
         except requests.RequestException as e:
             logging.error(f"Failed to download model {model_id}: {e}")
 
+    # distribute_binary()
+    # Distributes the model binary to a range of clients.
     def distribute_binary(self, model_id, range_start, range_end):
         # Given a model ID and a range of clients, distribute the model binary to those clients
         try:
@@ -446,6 +498,9 @@ class CIVICServer:
         except requests.RequestException as e:
             logging.error(f"Failed to distribute model {model_id}: {e}")
 
+    # execute_binary()
+    # Executes the model binary on a range of clients.
+    # Primarily used for testing purposes.
     def execute_binary(self, model_id, range_start, range_end):
         if self.clients:
             # Validate range
@@ -470,6 +525,9 @@ class CIVICServer:
                         f"Failed to execute model {model_id} on client {client_uuid}: {e}"
                     )
 
+    # generate_duties()
+    # Generates duties for a model and distributes them to clients.
+    # Model expected to be download and distributed to clients first.
     def generate_duties(self, model_id, range_start, range_end):
         if self.clients:
             # Validate range
@@ -505,6 +563,9 @@ class CIVICServer:
             for client_uuid, client_socket in client_list:
                 self.send_duty(client_socket)
 
+    # send_duty()
+    # Sends a duty to the client if available.
+    # If no duties are available, sends a "NONE" message.
     def send_duty(self, client_socket):
         if not self.duties.empty():
             logging.debug("Remaining duties: %d", self.duties.qsize())
@@ -517,6 +578,9 @@ class CIVICServer:
                 f"Tried to send a duty to a client, but no duties are available."
             )
 
+    # handle_results()
+    # Handles results received from the client.
+    # It parses the results and sends them to the middleware server.
     def handle_results(self, client_uuid, message):
         # Handle results from the client
         results_raw = message.split(" ")[1:]
@@ -539,6 +603,9 @@ class CIVICServer:
             logging.error(f"Failed to upload results for client {client_uuid}: {e}")
 
 
+# main()
+# Main function to start the server using curses
+# It initializes the server and handles cleanup on exit.
 def main(stdscr):
     server = CIVICServer(stdscr)
     signal.signal(signal.SIGINT, server.safe_exit)
