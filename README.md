@@ -1,6 +1,7 @@
 # CIVIC
 
 - [CIVIC](#civic)
+  - [Usage](#usage)
   - [Team Information](#team-information)
   - [Problem Statement](#problem-statement)
     - [Issues identified in existing solutions](#issues-identified-in-existing-solutions)
@@ -13,6 +14,26 @@
     - [Work expected](#work-expected)
     - [Expected outcomes](#expected-outcomes)
   - [Design diagram](#design-diagram)
+
+## Usage
+
+1. Install the CIVIC Server by using the `server_manager.py` installation script.
+2. Create a binary program you'd like to distribute.
+   1. Have your program take in a file `input` and generate a file `output` in JSON for best results.
+   2. See the included Alphabet model for an example.
+3. Follow the model creation flow within the `server_manager.py` script:
+   1. Manage Models > Create Model
+      1. Enter information about the model
+      2. Upload v1 of the model binary
+   2. Manage Datasets > Create Dataset
+      1. Enter path to dataset
+      2. Follow instructions and guide for parsing data
+4. Generate and distribute duties (work) to connected citizens (clients)
+   1. Attach to the internal server console (Manage Server > Attach to Server Console)
+   2. Download the model to the internal server: `download <id>`
+   3. Distribute to connected clients: `distribute <model_id> <range_start> <range_end>`
+   4. Generate duties (automatically distributes to range of clients given): `generate_duties <model_id> <range_start> <range_end>`
+5. View execution results via command-line connection to PostgreSQL database or through provided Adminer installation
 
 ## Team Information
 
